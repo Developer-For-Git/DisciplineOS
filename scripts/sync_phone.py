@@ -54,11 +54,11 @@ def resolve_phone_url(target_override=None):
 
     # Check Hotspot Gateway first (physical phone)
     gw = get_hotspot_gateway()
-    if gw and check_port_open(gw, DEFAULT_PORT, timeout=0.6):
+    if gw and check_port_open(gw, DEFAULT_PORT, timeout=1.2):
         return f"http://{gw}:{DEFAULT_PORT}"
 
     # Check Localhost (USB ADB / Emulator)
-    if check_port_open("127.0.0.1", DEFAULT_PORT, timeout=0.3):
+    if check_port_open("127.0.0.1", DEFAULT_PORT, timeout=0.5):
         return f"http://127.0.0.1:{DEFAULT_PORT}"
 
     # If neither is responding, fall back to gateway if found, else localhost
