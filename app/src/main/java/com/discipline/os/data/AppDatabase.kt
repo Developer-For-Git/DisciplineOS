@@ -247,7 +247,7 @@ abstract class AppDatabase : RoomDatabase() {
                     url = "https://youtu.be/irqbmMNs2Bo",
                     category = "Coding",
                     reminderType = "RAPID_VIBRATE",
-                    reminderDelayText = "Tonight 20:00",
+                    reminderDelayText = "Tomorrow 07:30",
                     notes = "Crucial pointer and memory management lectures. Code along in GCC."
                 ),
                 VideoEntry(
@@ -255,13 +255,28 @@ abstract class AppDatabase : RoomDatabase() {
                     url = "https://youtu.be/2NX09qFm01M",
                     category = "Security",
                     reminderType = "RAPID_VIBRATE",
-                    reminderDelayText = "Tomorrow 07:30",
+                    reminderDelayText = "Tonight 20:27",
                     notes = "Core networking, Linux terminal commands, and basic privilege escalation."
                 )
             )
             val videosToInsert = defaultVideos.filter { it.url.trim().lowercase() !in existingVideos }
             if (videosToInsert.isNotEmpty()) {
                 videoDao.insertVideos(videosToInsert)
+            }
+
+            // Auto-normalize any existing videos to correct routine schedule
+            val allVideos = videoDao.getAllVideosSync()
+            for (v in allVideos) {
+                var updated = v
+                val titleLower = v.title.lowercase()
+                if (titleLower.contains("c language") && (v.reminderDelayText.contains("20:00") || v.reminderDelayText.isBlank())) {
+                    updated = updated.copy(reminderDelayText = "Tomorrow 07:30")
+                } else if (titleLower.contains("tryhackme") && (v.reminderDelayText.contains("07:30") || v.reminderDelayText.isBlank())) {
+                    updated = updated.copy(reminderDelayText = "Tonight 20:27")
+                }
+                if (updated != v) {
+                    videoDao.updateVideo(updated)
+                }
             }
         }
     }
