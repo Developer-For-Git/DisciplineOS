@@ -20,6 +20,64 @@ object UpdateManager {
     const val DEFAULT_UPDATE_SERVER = "http://10.137.177.187:8081"
     private const val PREFS_NAME = "discipline_prefs"
     private const val KEY_UPDATE_SERVER = "update_server_url"
+    private const val KEY_OFFLINE_UPDATE_CODE = "offline_update_version_code"
+    private const val KEY_OFFLINE_UPDATE_NAME = "offline_update_version_name"
+    private const val KEY_OFFLINE_UPDATE_PATH = "offline_update_file_path"
+    private const val KEY_OFFLINE_UPDATE_TITLE = "offline_update_title"
+    private const val KEY_OFFLINE_UPDATE_NOTES = "offline_update_notes"
+
+    // Reactive flow for real-time live update popups over Wi-Fi
+    val liveUpdateNotificationFlow = kotlinx.coroutines.flow.MutableSharedFlow<UpdateInfo>(replay = 1, extraBufferCapacity = 2)
+
+    fun saveOfflineUpdate(context: Context, file: File, info: UpdateInfo) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putLong(KEY_OFFLINE_UPDATE_CODE, info.versionCode)
+            .putString(KEY_OFFLINE_UPDATE_NAME, info.versionName)
+            .putString(KEY_OFFLINE_UPDATE_PATH, file.absolutePath)
+            .putString(KEY_OFFLINE_UPDATE_TITLE, info.title)
+            .putString(KEY_OFFLINE_UPDATE_NOTES, info.releaseNotes.joinToString("\n"))
+            .apply()
+    }
+
+    fun getSavedOfflineUpdate(context: Context): UpdateInfo? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedCode = prefs.getLong(KEY_OFFLINE_UPDATE_CODE, 0L)
+        val savedPath = prefs.getString(KEY_OFFLINE_UPDATE_PATH, null)
+        val currentCode = getCurrentVersionCode(context)
+
+        if (savedCode > currentCode && !savedPath.isNullOrBlank()) {
+            val file = File(savedPath)
+            if (file.exists() && file.length() > 0L) {
+                val savedName = prefs.getString(KEY_OFFLINE_UPDATE_NAME, "New Version") ?: "New Version"
+                val savedTitle = prefs.getString(KEY_OFFLINE_UPDATE_TITLE, "Offline Update Ready") ?: "Offline Update Ready"
+                val rawNotes = prefs.getString(KEY_OFFLINE_UPDATE_NOTES, "") ?: ""
+                val notes = if (rawNotes.isNotBlank()) rawNotes.lines() else emptyList()
+                return UpdateInfo(
+                    versionCode = savedCode,
+                    versionName = savedName,
+                    title = savedTitle,
+                    apkUrl = "",
+                    releaseNotes = notes,
+                    fileSizeBytes = file.length(),
+                    isOfflineReady = true,
+                    localFilePath = file.absolutePath
+                )
+            }
+        }
+        return null
+    }
+
+    fun clearOfflineUpdate(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .remove(KEY_OFFLINE_UPDATE_CODE)
+            .remove(KEY_OFFLINE_UPDATE_NAME)
+            .remove(KEY_OFFLINE_UPDATE_PATH)
+            .remove(KEY_OFFLINE_UPDATE_TITLE)
+            .remove(KEY_OFFLINE_UPDATE_NOTES)
+            .apply()
+    }
 
     fun getSavedServerUrl(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

@@ -9,7 +9,9 @@ data class UpdateInfo(
     val apkUrl: String,
     val releaseNotes: List<String>,
     val fileSizeBytes: Long = 0L,
-    val mandatory: Boolean = false
+    val mandatory: Boolean = false,
+    val isOfflineReady: Boolean = false,
+    val localFilePath: String? = null
 )
 
 sealed class DownloadState {
@@ -23,5 +25,6 @@ sealed class DownloadState {
         val info: UpdateInfo
     ) : DownloadState()
     data class Downloaded(val apkFile: File, val info: UpdateInfo) : DownloadState()
+    data class SavedOffline(val apkFile: File, val info: UpdateInfo) : DownloadState()
     data class Error(val message: String) : DownloadState()
 }

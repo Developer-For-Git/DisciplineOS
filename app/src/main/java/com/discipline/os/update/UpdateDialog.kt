@@ -78,15 +78,15 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(AccentFlameSoft)
+                            .background(if (updateInfo.isOfflineReady) AccentCyanSoft else AccentFlameSoft)
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🚀", fontSize = 13.sp)
+                            Text(text = if (updateInfo.isOfflineReady) "💾" else "🚀", fontSize = 13.sp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "OTA UPDATE READY",
-                                color = AccentFlame,
+                                text = if (updateInfo.isOfflineReady) "OFFLINE UPDATE READY" else "OTA UPDATE READY",
+                                color = if (updateInfo.isOfflineReady) AccentCyan else AccentFlame,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.8.sp
@@ -223,11 +223,12 @@ fun UpdateDialog(
                 // 3. Dynamic Action / Progress Area
                 when (val state = downloadState) {
                     is DownloadState.Idle -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (!updateInfo.mandatory) {
+                        if (updateInfo.isOfflineReady) {
+                            // Saved Offline Mode: App launch or offline prompt
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
                                 OutlinedButton(
                                     onClick = onDismiss,
                                     shape = RoundedCornerShape(16.dp),
@@ -235,44 +236,186 @@ fun UpdateDialog(
                                     border = BorderStroke(1.dp, BorderSubtle),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("Not Now", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("Install Later", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val f = File(updateInfo.localFilePath ?: "")
+                                        if (f.exists()) {
+                                            UpdateManager.installApk(context, f)
+                                            onInstallStarted()
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = PrimaryActionBg,
+                                        contentColor = PrimaryActionFg
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Install Now", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        } else {
+                            // Online Wi-Fi Update Mode: Full 3-action choice
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // 1. Direct Update Now
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            downloadState = DownloadState.Downloading(0f, 0L, updateInfo.fileSizeBytes, updateInfo)
+                                            val result = UpdateManager.downloadApk(context, updateInfo) { progress, down, total ->
+                                                downloadState = DownloadState.Downloading(progress, down, total, updateInfo)
+                                            }
+                                            result.fold(
+                                                onSuccess = { file ->
+                                                    downloadedFile = file
+                                                    downloadState = DownloadState.Downloaded(file, updateInfo)
+                                                    val installed = UpdateManager.installApk(context, file)
+                                                    if (installed) {
+                                                        onInstallStarted()
+                                                    }
+                                                },
+                                                onFailure = { err ->
+                                                    downloadState = DownloadState.Error(err.message ?: "Download failed")
+                                                }
+                                            )
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = PrimaryActionBg,
+                                        contentColor = PrimaryActionFg
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Update Now (Download & Install)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                // 2. Save Offline / Update Later + Skip
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    if (!updateInfo.mandatory) {
+                                        OutlinedButton(
+                                            onClick = onDismiss,
+                                            shape = RoundedCornerShape(16.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                                            border = BorderStroke(1.dp, BorderSubtle),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Skip", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                downloadState = DownloadState.Downloading(0f, 0L, updateInfo.fileSizeBytes, updateInfo)
+                                                val result = UpdateManager.downloadApk(context, updateInfo) { progress, down, total ->
+                                                    downloadState = DownloadState.Downloading(progress, down, total, updateInfo)
+                                                }
+                                                result.fold(
+                                                    onSuccess = { file ->
+                                                        downloadedFile = file
+                                                        UpdateManager.saveOfflineUpdate(context, file, updateInfo)
+                                                        downloadState = DownloadState.SavedOffline(file, updateInfo)
+                                                    },
+                                                    onFailure = { err ->
+                                                        downloadState = DownloadState.Error(err.message ?: "Download failed")
+                                                    }
+                                                )
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentCyan),
+                                        border = BorderStroke(1.dp, AccentCyan.copy(alpha = 0.5f)),
+                                        modifier = Modifier.weight(1.5f)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("💾", fontSize = 12.sp)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Save Offline (Later)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is DownloadState.SavedOffline -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = AccentCyanSoft,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AccentCyan, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Saved Offline Successfully! 💾",
+                                            color = AccentCyan,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Stored on your device. You can install it anytime even without Wi-Fi.",
+                                            color = TextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
                             }
 
-                            Button(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        downloadState = DownloadState.Downloading(0f, 0L, updateInfo.fileSizeBytes, updateInfo)
-                                        val result = UpdateManager.downloadApk(context, updateInfo) { progress, down, total ->
-                                            downloadState = DownloadState.Downloading(progress, down, total, updateInfo)
-                                        }
-                                        result.fold(
-                                            onSuccess = { file ->
-                                                downloadedFile = file
-                                                downloadState = DownloadState.Downloaded(file, updateInfo)
-                                                // Automatically launch Android package installer!
-                                                val installed = UpdateManager.installApk(context, file)
-                                                if (installed) {
-                                                    onInstallStarted()
-                                                }
-                                            },
-                                            onFailure = { err ->
-                                                downloadState = DownloadState.Error(err.message ?: "Download failed")
-                                            }
-                                        )
-                                    }
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryActionBg,
-                                    contentColor = PrimaryActionFg
-                                ),
-                                modifier = Modifier.weight(1f)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Update Now", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                OutlinedButton(
+                                    onClick = onDismiss,
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextSecondary),
+                                    border = BorderStroke(1.dp, BorderSubtle),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Close", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val file = downloadedFile ?: state.apkFile
+                                        UpdateManager.installApk(context, file)
+                                        onInstallStarted()
+                                    },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = PrimaryActionBg,
+                                        contentColor = PrimaryActionFg
+                                    ),
+                                    modifier = Modifier.weight(1.3f)
+                                ) {
+                                    Text("Install Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

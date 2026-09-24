@@ -34,6 +34,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.discipline.os.alarm.AlarmScheduler
 import com.discipline.os.alarm.VibrationHelper
@@ -102,20 +105,52 @@ class MainActivity : ComponentActivity() {
                 var pendingUpdateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
 
-                // Automatically check for OTA update on launch over Wi-Fi
+                // 1. Reactive live update flow: Pops up on screen instantly when update is published from PC
                 LaunchedEffect(Unit) {
-                    launch(Dispatchers.IO) {
-                        try {
-                            val result = UpdateManager.checkForUpdate(this@MainActivity)
-                            result.onSuccess { info ->
-                                if (info != null) {
+                    UpdateManager.liveUpdateNotificationFlow.collect { info ->
+                        if (info.versionCode > UpdateManager.getCurrentVersionCode(this@MainActivity)) {
+                            withContext(Dispatchers.Main) {
+                                pendingUpdateInfo = info
+                                showUpdateDialog = true
+                            }
+                        }
+                    }
+                }
+
+                // 2. On launch and on resume: check offline saved update first, then Wi-Fi server
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                // First check if an offline update is already downloaded and saved on device
+                                val offlineSaved = UpdateManager.getSavedOfflineUpdate(this@MainActivity)
+                                if (offlineSaved != null) {
                                     withContext(Dispatchers.Main) {
-                                        pendingUpdateInfo = info
+                                        pendingUpdateInfo = offlineSaved
                                         showUpdateDialog = true
                                     }
+                                    return@launch
                                 }
+
+                                // Otherwise check Wi-Fi update server
+                                try {
+                                    val result = UpdateManager.checkForUpdate(this@MainActivity)
+                                    result.onSuccess { info ->
+                                        if (info != null) {
+                                            withContext(Dispatchers.Main) {
+                                                pendingUpdateInfo = info
+                                                showUpdateDialog = true
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) {}
                             }
-                        } catch (_: Exception) {}
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
                     }
                 }
 

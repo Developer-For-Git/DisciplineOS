@@ -646,6 +646,54 @@ object LocalSyncServer {
                     }.toString()
                 }
 
+                // 18.5 Push / Notify Live Update to Active App Screen
+                (path == "/api/update/notify" || path == "/api/update/trigger") && method == "POST" -> {
+                    try {
+                        val json = if (body.isNotBlank()) JSONObject(body) else JSONObject()
+                        val vCode = json.optLong("versionCode", 0L)
+                        val vName = json.optString("versionName", "")
+                        val title = json.optString("title", "DisciplineOS Update")
+                        val apkUrl = json.optString("apkUrl", "")
+                        val notes = mutableListOf<String>()
+                        json.optJSONArray("releaseNotes")?.let { arr ->
+                            for (i in 0 until arr.length()) notes.add(arr.getString(i))
+                        }
+                        val fileSizeBytes = json.optLong("fileSizeBytes", 0L)
+
+                        val info = if (vCode > 0) {
+                            com.discipline.os.update.UpdateInfo(
+                                versionCode = vCode,
+                                versionName = vName,
+                                title = title,
+                                apkUrl = apkUrl,
+                                releaseNotes = notes,
+                                fileSizeBytes = fileSizeBytes
+                            )
+                        } else {
+                            com.discipline.os.update.UpdateManager.checkForUpdate(context, forceCheck = true).getOrNull()
+                        }
+
+                        if (info != null) {
+                            com.discipline.os.update.UpdateManager.liveUpdateNotificationFlow.tryEmit(info)
+                            responseJson = JSONObject().apply {
+                                put("success", true)
+                                put("message", "Live update popup triggered on screen")
+                                put("versionCode", info.versionCode)
+                                put("versionName", info.versionName)
+                            }.toString()
+                        } else {
+                            statusCode = 404
+                            responseJson = "{\"error\": \"No valid update info found\"}"
+                        }
+                    } catch (e: Exception) {
+                        statusCode = 400
+                        responseJson = JSONObject().apply {
+                            put("success", false)
+                            put("error", e.message ?: "Failed to trigger update")
+                        }.toString()
+                    }
+                }
+
                 // 19. Universal Agent Command Dispatcher (Single Unified AI Control Endpoint)
                 (path == "/api/command" || path == "/api/exec") && method == "POST" -> {
                     try {

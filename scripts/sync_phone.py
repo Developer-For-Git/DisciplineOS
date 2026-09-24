@@ -333,12 +333,18 @@ if __name__ == "__main__":
         res = http_request("POST", "/api/restore", data, base_url=custom_url)
         print("✅ Database restored:", res.get("message"))
 
+    elif cmd in ("publish-update", "publish", "release"):
+        import subprocess
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "publish_update.py")
+        subprocess.run([sys.executable, script] + args[1:], check=False)
+
     else:
         print("DisciplineOS Unified Sync Bridge:")
         print("  python sync_phone.py ping                           (Test connection to phone)")
         print("  python sync_phone.py list                           (Show all tasks on phone)")
         print("  python sync_phone.py add \"Title\" 20:00 [priority]   (Add single task)")
         print("  python sync_phone.py add-batch '[{...}, {...}]'     (Add multiple tasks at once)")
+        print("  python sync_phone.py publish-update \"Release notes\" (1-command compile, deploy, OTA push)")
         print("  python sync_phone.py complete <id>                  (Mark task done)")
         print("  python sync_phone.py delete <id>                    (Delete task)")
         print("  python sync_phone.py backup                         (Backup phone database)")
