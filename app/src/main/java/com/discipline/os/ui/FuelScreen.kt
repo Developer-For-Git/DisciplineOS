@@ -102,27 +102,26 @@ fun FuelScreen(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        // Sleek Add Fuel Pill Button - Never wraps or squishes
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = AccentFlameSoft,
-                            border = BorderStroke(1.dp, AccentFlame.copy(alpha = 0.4f)),
-                            modifier = Modifier.clickable { showDialog = true }
+                        // Sleek Add Fuel Pill Button - Consistent with Add Video & Add Habit
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(PrimaryActionBg)
+                                .clickable { showDialog = true }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
                                     contentDescription = "Add",
-                                    tint = AccentFlame,
+                                    tint = PrimaryActionFg,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "Add Fuel",
-                                    color = AccentFlame,
+                                    color = PrimaryActionFg,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
