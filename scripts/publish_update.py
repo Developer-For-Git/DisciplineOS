@@ -149,6 +149,76 @@ def push_git_repo(name):
     except Exception as e:
         print(f"⚠️ Git push notice: {e}")
 
+def publish_github_release(code, name, notes, apk_path):
+    token_path = r"C:\Users\LOL\.github_token"
+    if not os.path.exists(token_path):
+        return
+    with open(token_path, "r", encoding="utf-8") as f:
+        token = f.read().strip()
+    if not token:
+        return
+
+    tag = f"v{name}"
+    repo = "Developer-For-Git/DisciplineOS"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "DisciplineOS-Publisher"
+    }
+
+    body = f"## DisciplineOS v{name} (Build {code})\n\n"
+    if notes:
+        body += "### What's New:\n" + "\n".join(f"- {n}" for n in notes)
+    else:
+        body += "Performance optimizations, live OTA engine & stability enhancements."
+
+    url = f"https://api.github.com/repos/{repo}/releases"
+    payload = {
+        "tag_name": tag,
+        "target_commitish": "main",
+        "name": f"DisciplineOS v{name}",
+        "body": body,
+        "draft": False,
+        "prerelease": False
+    }
+
+    print(f"📦 Publishing GitHub Release {tag}...")
+    release_data = None
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method="POST")
+        with urllib.request.urlopen(req) as resp:
+            release_data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err = e.read().decode('utf-8')
+        if "already_exists" in err:
+            get_req = urllib.request.Request(f"{url}/tags/{tag}", headers=headers)
+            with urllib.request.urlopen(get_req) as resp:
+                release_data = json.loads(resp.read().decode('utf-8'))
+
+    if release_data and os.path.exists(apk_path):
+        upload_url = release_data.get("upload_url", "").split("{")[0] + f"?name=DisciplineOS-{tag}.apk"
+        size = os.path.getsize(apk_path)
+        print(f"⬆️ Uploading APK asset to GitHub Releases ({size / (1024*1024):.1f} MB)...")
+        with open(apk_path, "rb") as f:
+            apk_bytes = f.read()
+        upload_headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/vnd.android.package-archive",
+            "Content-Length": str(size),
+            "User-Agent": "DisciplineOS-Publisher"
+        }
+        try:
+            up_req = urllib.request.Request(upload_url, data=apk_bytes, headers=upload_headers, method="POST")
+            with urllib.request.urlopen(up_req) as resp:
+                asset_res = json.loads(resp.read().decode('utf-8'))
+                print(f"🎉 Asset available: {asset_res.get('browser_download_url')}")
+        except Exception as e:
+            print(f"Asset upload notice: {e}")
+
+    if release_data:
+        print(f"🔗 GitHub Release URL: {release_data.get('html_url')}")
+
 def main():
     args = sys.argv[1:]
     notes = []
@@ -177,8 +247,11 @@ def main():
     # 3. Trigger live update popup on phone screen immediately
     notify_phone_live(manifest)
 
-    # 4. Commit and push to GitHub
+    # 4. Commit and push code to GitHub
     push_git_repo(name)
+
+    # 5. Automatically create GitHub Release and upload APK binary
+    publish_github_release(code, name, notes, APK_TARGET)
 
     print("\n" + "=" * 60)
     print(f"🎉 DISCIPLINE OS v{name} OTA UPDATE SUCCESSFULLY PUBLISHED!")
@@ -186,6 +259,7 @@ def main():
     print(f"   • APK URL:      {manifest['apkUrl']}")
     print(f"   • Size:         {manifest['fileSizeBytes']} bytes")
     print(f"   • Live Trigger: Active on port 8080")
+    print(f"   • GitHub Rel:   https://github.com/Developer-For-Git/DisciplineOS/releases")
     print("=" * 60 + "\n")
 
 if __name__ == "__main__":
