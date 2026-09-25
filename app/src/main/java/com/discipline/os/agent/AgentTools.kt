@@ -162,6 +162,119 @@ object AgentTools {
                 name = "reset_today",
                 description = "Uncheck all completed protocols for today so the user can restart their daily routine."
             ))
+
+            put(buildToolObj(
+                name = "get_roadmaps",
+                description = "Get all active roadmap journeys (e.g. Calisthenics Journey, Coding Roadmap), their progress percentages, active stages, and current levels."
+            ))
+
+            put(buildToolObj(
+                name = "get_roadmap_detail",
+                description = "Get detailed stages, exercises/milestones, checklists, and active focus for a specific roadmap journey.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Roadmap title keyword or ID (e.g. 'Calisthenics')")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
+                name = "update_roadmap_step",
+                description = "Mark a roadmap milestone/exercise as completed or set it as the current active training level.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Milestone title keyword or node ID (e.g. 'Pillar 1: PUSH', 'Wall Push-ups')")
+                    })
+                    put("completed", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "Whether the milestone is completed")
+                    })
+                    put("isCurrent", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "Set as the user's current active level")
+                    })
+                    put("repsOrCriteria", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Updated criteria or personal record (e.g. '3 sets of 15 clean reps')")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
+                name = "toggle_roadmap_checklist",
+                description = "Toggle a specific checklist item in a roadmap step (e.g. check off Wall Push-ups 3x15).",
+                properties = JSONObject().apply {
+                    put("nodeQuery", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Node title keyword or ID")
+                    })
+                    put("checklistItemIndex", JSONObject().apply {
+                        put("type", "integer")
+                        put("description", "0-based index of the checklist item")
+                    })
+                    put("done", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "True if completed, false if pending")
+                    })
+                },
+                required = listOf("nodeQuery", "checklistItemIndex", "done")
+            ))
+
+            put(buildToolObj(
+                name = "add_roadmap",
+                description = "Create a new custom roadmap journey in the database.",
+                properties = JSONObject().apply {
+                    put("title", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Roadmap title (e.g. 'Cybersecurity Hacker Path')")
+                    })
+                    put("category", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Category (e.g. 'Fitness', 'Coding', 'Security', 'Life')")
+                    })
+                    put("description", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Description and target outcome")
+                    })
+                    put("targetGoal", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Ultimate end goal to achieve")
+                    })
+                },
+                required = listOf("title")
+            ))
+
+            put(buildToolObj(
+                name = "add_roadmap_step",
+                description = "Add a new milestone, phase, or exercise progression to an existing roadmap.",
+                properties = JSONObject().apply {
+                    put("roadmapQuery", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Target roadmap title keyword or ID")
+                    })
+                    put("stage", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Phase name (e.g. 'Phase 1: Foundation', 'Phase 2: Intermediate')")
+                    })
+                    put("title", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Step title (e.g. 'Bar Muscle-Up Transition')")
+                    })
+                    put("description", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Instructions, cues, and requirements")
+                    })
+                    put("repsOrCriteria", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Target reps or qualification criteria")
+                    })
+                },
+                required = listOf("roadmapQuery", "stage", "title")
+            ))
         }
     }
 
@@ -200,6 +313,7 @@ object AgentTools {
         val fuelDao = db.fuelDao()
         val videoDao = db.videoDao()
         val dailyLogDao = db.dailyLogDao()
+        val roadmapDao = db.roadmapDao()
 
         return try {
             when (toolName) {
@@ -482,6 +596,274 @@ object AgentTools {
                         summary = "Reset all protocols for today",
                         outputJson = "{\"success\": true, \"message\": \"Protocols reset\"}"
                     )
+                }
+
+                "get_roadmaps" -> {
+                    val roadmaps = roadmapDao.getAllRoadmapsSync()
+                    val arr = JSONArray()
+                    for (r in roadmaps) {
+                        val nodes = roadmapDao.getNodesForRoadmapSync(r.id)
+                        val completedCount = nodes.count { it.isCompleted }
+                        val currentNode = nodes.find { it.isCurrent }
+                        arr.put(JSONObject().apply {
+                            put("id", r.id)
+                            put("title", r.title)
+                            put("category", r.category)
+                            put("currentLevel", r.currentLevel)
+                            put("activeFocus", currentNode?.title ?: "None")
+                            put("progressPercentage", r.progressPercentage)
+                            put("completedNodes", completedCount)
+                            put("totalNodes", nodes.size)
+                        })
+                    }
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Retrieved ${roadmaps.size} roadmap journeys",
+                        outputJson = JSONObject().apply {
+                            put("totalRoadmaps", roadmaps.size)
+                            put("roadmaps", arr)
+                        }.toString()
+                    )
+                }
+
+                "get_roadmap_detail" -> {
+                    val query = args.optString("query", "").trim()
+                    val allRoadmaps = roadmapDao.getAllRoadmapsSync()
+                    val target = allRoadmaps.find {
+                        it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                    } ?: allRoadmaps.firstOrNull()
+
+                    if (target == null) {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "No roadmap found matching '$query'",
+                            outputJson = "{\"error\": \"Roadmap not found\"}"
+                        )
+                    } else {
+                        val nodes = roadmapDao.getNodesForRoadmapSync(target.id)
+                        val nodesArr = JSONArray()
+                        for (n in nodes) {
+                            nodesArr.put(JSONObject().apply {
+                                put("id", n.id)
+                                put("stage", n.stage)
+                                put("stepOrder", n.stepOrder)
+                                put("title", n.title)
+                                put("repsOrCriteria", n.repsOrCriteria)
+                                put("isCompleted", n.isCompleted)
+                                put("isCurrent", n.isCurrent)
+                                put("description", n.description)
+                                put("checklist", try { JSONArray(n.checklistJson) } catch (_: Exception) { JSONArray() })
+                            })
+                        }
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Roadmap '${target.title}': ${nodes.count { it.isCompleted }}/${nodes.size} completed (${target.progressPercentage.toInt()}%)",
+                            outputJson = JSONObject().apply {
+                                put("id", target.id)
+                                put("title", target.title)
+                                put("category", target.category)
+                                put("targetGoal", target.targetGoal)
+                                put("currentLevel", target.currentLevel)
+                                put("progressPercentage", target.progressPercentage)
+                                put("nodes", nodesArr)
+                            }.toString()
+                        )
+                    }
+                }
+
+                "update_roadmap_step" -> {
+                    val query = args.optString("query", "").trim()
+                    val allNodes = roadmapDao.getAllNodesSync()
+                    val target = allNodes.find {
+                        it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                    }
+
+                    if (target == null) {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Roadmap step not found matching '$query'",
+                            outputJson = "{\"error\": \"Step not found\"}"
+                        )
+                    } else {
+                        var updated = target
+                        if (args.has("completed")) {
+                            val comp = args.getBoolean("completed")
+                            updated = updated.copy(isCompleted = comp)
+                        }
+                        if (args.has("isCurrent")) {
+                            val curr = args.getBoolean("isCurrent")
+                            if (curr) {
+                                roadmapDao.clearCurrentForRoadmap(target.roadmapId)
+                                updated = updated.copy(isCurrent = true)
+                                val roadmap = roadmapDao.getRoadmapById(target.roadmapId)
+                                if (roadmap != null) {
+                                    roadmapDao.updateRoadmap(roadmap.copy(currentLevel = "${target.stage}: ${target.title}", updatedAt = System.currentTimeMillis()))
+                                }
+                            } else {
+                                updated = updated.copy(isCurrent = false)
+                            }
+                        }
+                        if (args.has("repsOrCriteria") && args.getString("repsOrCriteria").isNotBlank()) {
+                            updated = updated.copy(repsOrCriteria = args.getString("repsOrCriteria").trim())
+                        }
+                        roadmapDao.updateNode(updated)
+
+                        // Recalculate roadmap progress
+                        val nodes = roadmapDao.getNodesForRoadmapSync(target.roadmapId)
+                        val compCount = nodes.count { it.isCompleted }
+                        val prog = if (nodes.isNotEmpty()) (compCount.toFloat() / nodes.size) * 100f else 0f
+                        val roadmap = roadmapDao.getRoadmapById(target.roadmapId)
+                        if (roadmap != null) {
+                            roadmapDao.updateRoadmapProgress(roadmap.id, roadmap.currentLevel, prog)
+                        }
+
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Updated milestone '${updated.title}': completed=${updated.isCompleted}, current=${updated.isCurrent} (Roadmap progress: ${prog.toInt()}%)",
+                            outputJson = JSONObject().apply {
+                                put("stepId", updated.id)
+                                put("title", updated.title)
+                                put("isCompleted", updated.isCompleted)
+                                put("isCurrent", updated.isCurrent)
+                                put("repsOrCriteria", updated.repsOrCriteria)
+                                put("roadmapProgress", prog)
+                            }.toString()
+                        )
+                    }
+                }
+
+                "toggle_roadmap_checklist" -> {
+                    val nodeQuery = args.optString("nodeQuery", "").trim()
+                    val idx = args.optInt("checklistItemIndex", -1)
+                    val done = args.optBoolean("done", false)
+                    val allNodes = roadmapDao.getAllNodesSync()
+                    val target = allNodes.find {
+                        it.id.toString() == nodeQuery || it.title.contains(nodeQuery, ignoreCase = true)
+                    }
+
+                    if (target == null || idx < 0) {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Could not find node or invalid index for checklist",
+                            outputJson = "{\"error\": \"Invalid node or index\"}"
+                        )
+                    } else {
+                        val arr = try { JSONArray(target.checklistJson) } catch (_: Exception) { JSONArray() }
+                        if (idx < arr.length()) {
+                            val obj = arr.getJSONObject(idx)
+                            obj.put("done", done)
+                            val itemText = obj.optString("text", "item")
+                            val allDone = (0 until arr.length()).all { arr.getJSONObject(it).optBoolean("done", false) }
+                            val updatedNode = target.copy(checklistJson = arr.toString(), isCompleted = if (allDone) true else target.isCompleted)
+                            roadmapDao.updateNode(updatedNode)
+
+                            // Recalculate progress
+                            val nodes = roadmapDao.getNodesForRoadmapSync(target.roadmapId)
+                            val compCount = nodes.count { it.isCompleted }
+                            val prog = if (nodes.isNotEmpty()) (compCount.toFloat() / nodes.size) * 100f else 0f
+                            val roadmap = roadmapDao.getRoadmapById(target.roadmapId)
+                            if (roadmap != null) {
+                                roadmapDao.updateRoadmapProgress(roadmap.id, roadmap.currentLevel, prog)
+                            }
+
+                            ToolExecutionResult(
+                                toolName = toolName,
+                                success = true,
+                                summary = "Toggled '$itemText' to ${if (done) "done" else "pending"} in '${target.title}'",
+                                outputJson = JSONObject().apply {
+                                    put("itemText", itemText)
+                                    put("done", done)
+                                    put("nodeCompleted", updatedNode.isCompleted)
+                                    put("roadmapProgress", prog)
+                                }.toString()
+                            )
+                        } else {
+                            ToolExecutionResult(
+                                toolName = toolName,
+                                success = false,
+                                summary = "Index $idx out of bounds for node checklist",
+                                outputJson = "{\"error\": \"Index out of bounds\"}"
+                            )
+                        }
+                    }
+                }
+
+                "add_roadmap" -> {
+                    val title = args.optString("title", "").trim()
+                    val category = args.optString("category", "Fitness").trim()
+                    val desc = args.optString("description", "").trim()
+                    val targetGoal = args.optString("targetGoal", "").trim()
+                    val newId = roadmapDao.insertRoadmap(
+                        Roadmap(
+                            title = title,
+                            category = category,
+                            description = desc,
+                            targetGoal = targetGoal
+                        )
+                    )
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Created new roadmap '$title' (ID $newId)",
+                        outputJson = JSONObject().apply {
+                            put("id", newId)
+                            put("title", title)
+                            put("category", category)
+                        }.toString()
+                    )
+                }
+
+                "add_roadmap_step" -> {
+                    val rQuery = args.optString("roadmapQuery", "").trim()
+                    val stage = args.optString("stage", "Phase 1").trim()
+                    val title = args.optString("title", "").trim()
+                    val desc = args.optString("description", "").trim()
+                    val criteria = args.optString("repsOrCriteria", "").trim()
+                    val allRoadmaps = roadmapDao.getAllRoadmapsSync()
+                    val target = allRoadmaps.find {
+                        it.id.toString() == rQuery || it.title.contains(rQuery, ignoreCase = true)
+                    } ?: allRoadmaps.firstOrNull()
+
+                    if (target == null) {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Target roadmap '$rQuery' not found",
+                            outputJson = "{\"error\": \"Roadmap not found\"}"
+                        )
+                    } else {
+                        val existingNodes = roadmapDao.getNodesForRoadmapSync(target.id)
+                        val nextOrder = existingNodes.size + 1
+                        val nodeId = roadmapDao.insertNode(
+                            RoadmapNode(
+                                roadmapId = target.id,
+                                stage = stage,
+                                stepOrder = nextOrder,
+                                title = title,
+                                description = desc,
+                                repsOrCriteria = criteria,
+                                isCompleted = false,
+                                isCurrent = false
+                            )
+                        )
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Added milestone '$title' to roadmap '${target.title}'",
+                            outputJson = JSONObject().apply {
+                                put("id", nodeId)
+                                put("roadmapId", target.id)
+                                put("stage", stage)
+                                put("title", title)
+                            }.toString()
+                        )
+                    }
                 }
 
                 else -> {

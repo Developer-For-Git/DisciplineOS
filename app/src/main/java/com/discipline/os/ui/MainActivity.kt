@@ -15,6 +15,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
+import androidx.compose.material.icons.automirrored.outlined.AltRoute
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
@@ -45,6 +47,8 @@ import com.discipline.os.alarm.VibrationHelper
 import com.discipline.os.agent.AiAgentEngine
 import com.discipline.os.data.AppDatabase
 import com.discipline.os.data.FuelEntry
+import com.discipline.os.data.Roadmap
+import com.discipline.os.data.RoadmapNode
 import com.discipline.os.data.Task
 import com.discipline.os.data.VideoEntry
 import com.discipline.os.update.UpdateDialog
@@ -79,6 +83,7 @@ class MainActivity : ComponentActivity() {
         val fuelDao = db.fuelDao()
         val videoDao = db.videoDao()
         val dailyLogDao = db.dailyLogDao()
+        val roadmapDao = db.roadmapDao()
         val prefs = getSharedPreferences("discipline_prefs", Context.MODE_PRIVATE)
 
         setContent {
@@ -106,6 +111,8 @@ class MainActivity : ComponentActivity() {
                 val fuelList by fuelDao.getAllFuel().collectAsState(initial = emptyList())
                 val videoList by videoDao.getAllVideos().collectAsState(initial = emptyList())
                 val dailyLogs by dailyLogDao.getAllLogs().collectAsState(initial = emptyList())
+                val roadmaps by roadmapDao.getAllRoadmaps().collectAsState(initial = emptyList())
+                val roadmapNodes by roadmapDao.getAllNodes().collectAsState(initial = emptyList())
 
                 // Past Days History Dialog state
                 var showHistoryDialog by remember { mutableStateOf(false) }
@@ -166,7 +173,7 @@ class MainActivity : ComponentActivity() {
                 // Automatically switch to Videos tab if a shared link was detected
                 LaunchedEffect(sharedVideoUrl) {
                     if (sharedVideoUrl.isNotBlank()) {
-                        selectedTab = 1
+                        selectedTab = 2
                     }
                 }
 
@@ -265,10 +272,103 @@ class MainActivity : ComponentActivity() {
                                     showHistoryDialog = true
                                 },
                                 onOpenAi = {
-                                    selectedTab = 2
+                                    selectedTab = 3
+                                },
+                                onOpenRoadmap = {
+                                    selectedTab = 1
                                 }
                             )
-                            1 -> VideoScreen(
+                            1 -> RoadmapScreen(
+                                roadmaps = roadmaps,
+                                nodes = roadmapNodes,
+                                onToggleNodeCompleted = { node ->
+                                    val newStatus = !node.isCompleted
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        roadmapDao.setNodeCompleted(node.id, newStatus)
+                                        val allNodes = roadmapDao.getNodesForRoadmapSync(node.roadmapId)
+                                        val completedCount = allNodes.count { if (it.id == node.id) newStatus else it.isCompleted }
+                                        val pct = if (allNodes.isNotEmpty()) (completedCount.toFloat() / allNodes.size.toFloat()) * 100f else 0f
+                                        val currentStage = allNodes.find { it.isCurrent }?.stage ?: "Foundation"
+                                        roadmapDao.updateRoadmapProgress(node.roadmapId, currentStage, pct)
+                                    }
+                                    if (newStatus) {
+                                        VibrationHelper.triggerRapidVibration(this@MainActivity)
+                                    }
+                                },
+                                onSetCurrentNode = { node ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        roadmapDao.clearCurrentForRoadmap(node.roadmapId)
+                                        roadmapDao.setCurrentNode(node.id)
+                                        val allNodes = roadmapDao.getNodesForRoadmapSync(node.roadmapId)
+                                        val completedCount = allNodes.count { it.isCompleted }
+                                        val pct = if (allNodes.isNotEmpty()) (completedCount.toFloat() / allNodes.size.toFloat()) * 100f else 0f
+                                        roadmapDao.updateRoadmapProgress(node.roadmapId, node.stage, pct)
+                                    }
+                                    VibrationHelper.triggerRapidVibration(this@MainActivity)
+                                },
+                                onToggleChecklistItem = { node, idx ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        try {
+                                            val arr = org.json.JSONArray(node.checklistJson)
+                                            if (idx in 0 until arr.length()) {
+                                                val item = arr.getJSONObject(idx)
+                                                item.put("done", !item.optBoolean("done", false))
+                                                roadmapDao.updateNodeChecklist(node.id, arr.toString())
+                                            }
+                                        } catch (_: Exception) {}
+                                    }
+                                },
+                                onAddRoadmap = { title, cat, desc, goal ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val newMap = Roadmap(
+                                            title = title,
+                                            category = cat,
+                                            description = desc,
+                                            targetGoal = goal
+                                        )
+                                        roadmapDao.insertRoadmap(newMap)
+                                    }
+                                },
+                                onAddNode = { roadmapId, stage, title, desc, criteria, checklistJson ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val currentList = roadmapDao.getNodesForRoadmapSync(roadmapId)
+                                        val newNode = RoadmapNode(
+                                            roadmapId = roadmapId,
+                                            stage = stage,
+                                            stepOrder = currentList.size + 1,
+                                            title = title,
+                                            description = desc,
+                                            repsOrCriteria = criteria,
+                                            checklistJson = checklistJson
+                                        )
+                                        roadmapDao.insertNode(newNode)
+                                        val allUpdated = roadmapDao.getNodesForRoadmapSync(roadmapId)
+                                        val completedCount = allUpdated.count { it.isCompleted }
+                                        val pct = if (allUpdated.isNotEmpty()) (completedCount.toFloat() / allUpdated.size.toFloat()) * 100f else 0f
+                                        val currentStage = allUpdated.find { it.isCurrent }?.stage ?: stage
+                                        roadmapDao.updateRoadmapProgress(roadmapId, currentStage, pct)
+                                    }
+                                },
+                                onDeleteNode = { node ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        roadmapDao.deleteNode(node)
+                                        val remaining = roadmapDao.getNodesForRoadmapSync(node.roadmapId)
+                                        val completedCount = remaining.count { it.isCompleted }
+                                        val pct = if (remaining.isNotEmpty()) (completedCount.toFloat() / remaining.size.toFloat()) * 100f else 0f
+                                        val currentStage = remaining.find { it.isCurrent }?.stage ?: "Foundation"
+                                        roadmapDao.updateRoadmapProgress(node.roadmapId, currentStage, pct)
+                                    }
+                                },
+                                onDeleteRoadmap = { roadmap ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        roadmapDao.deleteRoadmap(roadmap)
+                                    }
+                                },
+                                onOpenAi = {
+                                    selectedTab = 3
+                                }
+                            )
+                            2 -> VideoScreen(
                                 videos = videoList,
                                 onAddVideo = { title, url, cat, reminderEpoch, reminderDelayText, reminderType, notes ->
                                     lifecycleScope.launch(Dispatchers.IO) {
@@ -297,6 +397,9 @@ class MainActivity : ComponentActivity() {
                                         videoDao.deleteVideo(video)
                                     }
                                 },
+                                onOpenRoadmap = {
+                                    selectedTab = 1
+                                },
                                 initialUrl = sharedVideoUrl,
                                 initialTitle = sharedVideoTitle,
                                 onClearInitial = {
@@ -304,12 +407,12 @@ class MainActivity : ComponentActivity() {
                                     sharedVideoTitle = ""
                                 }
                             )
-                            2 -> AgentScreen(
+                            3 -> AgentScreen(
                                 engine = agentEngine,
                                 onBack = { selectedTab = 0 },
                                 onShowHistory = { showHistoryDialog = true }
                             )
-                            3 -> FuelScreen(
+                            4 -> FuelScreen(
                                 fuelList = fuelList,
                                 onAddFuel = { person, vow, cat ->
                                     lifecycleScope.launch(Dispatchers.IO) {
@@ -328,7 +431,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
-                            4 -> SystemScreen(
+                            5 -> SystemScreen(
                                 totalTasks = tasks.size,
                                 completedTasks = tasks.count { it.isCompleted },
                                 totalVideos = videoList.size,
@@ -376,16 +479,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Floating Capsule Dock (Apple / TripGlide Style with 5 First-Class Tabs)
+                    // Floating Capsule Dock (Apple / TripGlide Style with 6 First-Class Tabs)
                     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                    if (imeBottom == 0.dp && selectedTab != 2) {
+                    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                    val dockBottomClearance = (if (navBottom > 48.dp) navBottom else 48.dp) + 38.dp
+                    if (imeBottom == 0.dp && selectedTab != 3) {
                         FloatingBottomDock(
                             selectedTab = selectedTab,
                             onTabSelected = { selectedTab = it },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .navigationBarsPadding()
-                                .padding(bottom = 16.dp)
+                                .padding(bottom = dockBottomClearance)
                         )
                     }
                 }
@@ -422,7 +526,7 @@ class MainActivity : ComponentActivity() {
 
 /**
  * Floating Stadium Capsule Navigation Dock
- * 5 Tabs: Protocols (0), Vault (1), Discipline AI (2), Fuel (3), System/Control (4)
+ * 6 Tabs: Protocols (0), Roadmap (1), Vault (2), Discipline AI (3), Fuel (4), System/Control (5)
  */
 @Composable
 fun FloatingBottomDock(
@@ -441,9 +545,9 @@ fun FloatingBottomDock(
                 .clip(CircleShape)
                 .background(colors.dockBg)
                 .border(if (colors.isDark) 1.dp else 0.dp, colors.dockBorder, CircleShape)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             // Tab 0: Home / Protocols
             DockItem(
@@ -454,40 +558,49 @@ fun FloatingBottomDock(
                 onClick = { onTabSelected(0) }
             )
 
-            // Tab 1: Vault / Study
+            // Tab 1: Roadmap (Progression & Skill Architecture)
             DockItem(
                 isSelected = selectedTab == 1,
-                icon = Icons.Outlined.PlayCircle,
-                selectedIcon = Icons.Filled.PlayArrow,
-                contentDescription = "Vault",
+                icon = Icons.AutoMirrored.Outlined.AltRoute,
+                selectedIcon = Icons.AutoMirrored.Filled.AltRoute,
+                contentDescription = "Roadmap",
                 onClick = { onTabSelected(1) }
             )
 
-            // Tab 2: Discipline AI (Autonomous Agent)
+            // Tab 2: Vault / Study
             DockItem(
                 isSelected = selectedTab == 2,
-                icon = Icons.Outlined.AutoAwesome,
-                selectedIcon = Icons.Filled.AutoAwesome,
-                contentDescription = "Discipline AI",
+                icon = Icons.Outlined.PlayCircle,
+                selectedIcon = Icons.Filled.PlayArrow,
+                contentDescription = "Vault",
                 onClick = { onTabSelected(2) }
             )
 
-            // Tab 3: Fuel / Prove Them Wrong
+            // Tab 3: Discipline AI (Autonomous Agent)
             DockItem(
                 isSelected = selectedTab == 3,
-                icon = Icons.Outlined.FavoriteBorder,
-                selectedIcon = Icons.Filled.Favorite,
-                contentDescription = "Fuel",
+                icon = Icons.Outlined.AutoAwesome,
+                selectedIcon = Icons.Filled.AutoAwesome,
+                contentDescription = "Discipline AI",
                 onClick = { onTabSelected(3) }
             )
 
-            // Tab 4: System / Sync & Control Center
+            // Tab 4: Fuel / Prove Them Wrong
             DockItem(
                 isSelected = selectedTab == 4,
+                icon = Icons.Outlined.FavoriteBorder,
+                selectedIcon = Icons.Filled.Favorite,
+                contentDescription = "Fuel",
+                onClick = { onTabSelected(4) }
+            )
+
+            // Tab 5: System / Sync & Control Center
+            DockItem(
+                isSelected = selectedTab == 5,
                 icon = Icons.Outlined.GridView,
                 selectedIcon = Icons.Filled.GridView,
                 contentDescription = "System",
-                onClick = { onTabSelected(4) }
+                onClick = { onTabSelected(5) }
             )
         }
     }
@@ -502,7 +615,7 @@ fun DockItem(
     onClick: () -> Unit
 ) {
     val colors = AppTheme.colors
-    val size = 46.dp
+    val size = 42.dp
     if (isSelected) {
         // Active Tab: High-Contrast Circle with Dark Icon
         Box(
@@ -517,7 +630,7 @@ fun DockItem(
                 imageVector = selectedIcon,
                 contentDescription = contentDescription,
                 tint = colors.dockActiveIcon,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     } else {
@@ -533,7 +646,7 @@ fun DockItem(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = colors.dockInactiveIcon,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }

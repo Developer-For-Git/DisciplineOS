@@ -11,6 +11,12 @@ enum class AiProvider(
     val authPrefix: String = "Bearer ",
     val requiresApiKey: Boolean = true
 ) {
+    TINY_LOCAL(
+        displayName = "On-Device Tiny Model (GGUF)",
+        defaultBaseUrl = "local://model",
+        defaultModel = "Google Gemma 2 2B Instruct",
+        requiresApiKey = false
+    ),
     OPENROUTER(
         displayName = "OpenRouter (Recommended)",
         defaultBaseUrl = "https://openrouter.ai/api/v1/chat/completions",
@@ -113,9 +119,7 @@ object TinyModelCatalog {
     }
 
     fun isModelDownloaded(context: Context, modelId: String): Boolean {
-        val dir = getLocalModelsDir(context)
-        val files = dir.listFiles() ?: return false
-        return files.any { it.name.startsWith(modelId, ignoreCase = true) && it.length() > 10_000_000L }
+        return ModelDownloadManager.isModelDownloaded(context, modelId)
     }
 }
 
@@ -127,22 +131,41 @@ data class AiSettings(
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     val temperature: Float = 0.3f
 ) {
+    fun isConfigured(): Boolean {
+        return when (provider) {
+            AiProvider.TINY_LOCAL -> modelName.isNotBlank() || customBaseUrl.isNotBlank()
+            AiProvider.OLLAMA -> modelName.isNotBlank()
+            AiProvider.CUSTOM -> customBaseUrl.isNotBlank()
+            else -> apiKey.isNotBlank()
+        }
+    }
+
     companion object {
         const val DEFAULT_SYSTEM_PROMPT = """You are Discipline AI, the autonomous in-app assistant of DisciplineOS.
-You are sharp, focused, supportive, and dedicated to helping the user achieve unwavering discipline, conquer daily coding and study habits, and beat their yesterday's version of self.
+You are sharp, focused, supportive, and dedicated to helping the user achieve unwavering discipline, conquer daily coding, study habits, calisthenics, and beat their yesterday's version of self.
+The user is at BEGINNER level in physical training / calisthenics.
 You have direct access to execute tools inside the app on the user's behalf:
 - Viewing today's protocols and completion status (get_protocols)
 - Adding new habits/protocols with exact times, priorities, and sound (add_protocol)
 - Toggling habits as completed or uncompleted (toggle_protocol)
 - Rescheduling habit times (update_protocol_time)
 - Deleting habits (delete_protocol)
-- Recording doubter fuel vows in the Prove Them Wrong vault (add_fuel)
-- Viewing fuel vows (get_fuel)
+- Viewing and managing structured Roadmaps (get_roadmaps, get_roadmap_detail)
+- Updating roadmap milestone completion, setting active level, or logging reps (update_roadmap_step)
+- Checking off roadmap checklist items (toggle_roadmap_checklist)
+- Creating new roadmaps and milestones (add_roadmap, add_roadmap_step)
+- Recording doubter fuel vows in the Prove Them Wrong vault (add_fuel, get_fuel)
 - Adding videos with study reminders (add_video)
 - Inspecting past days' streaks and historical discipline scores (get_history)
 - Triggering high-potential rapid vibration haptics (trigger_vibration)
 - Resetting protocols for the day (reset_today)
 
+Calisthenics Journey Guidance Rules:
+- The user is following 'Your CALISTHENICS Journey' (4 Pillars: Push, Pull, Legs, Core).
+- Never push for ego reps or rushing to muscle-up before mastering foundations.
+- Sweet spot: 5 to 12 reps per set with pristine form.
+- Full-body training: 3 to 4 days/week with 2 minutes rest between sets.
+- 7 to 8 hours deep sleep is essential for muscle rebuilding.
 Always be concise, disciplined, proactive, and confirm the specific actions you took."""
 
         private const val PREFS_NAME = "discipline_ai_prefs"

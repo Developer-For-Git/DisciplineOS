@@ -122,3 +122,76 @@ interface VideoDao {
     @Query("DELETE FROM videos")
     suspend fun clearAllVideos()
 }
+
+@Dao
+interface RoadmapDao {
+    @Query("SELECT * FROM roadmaps ORDER BY isPinned DESC, updatedAt DESC, id ASC")
+    fun getAllRoadmaps(): Flow<List<Roadmap>>
+
+    @Query("SELECT * FROM roadmaps ORDER BY isPinned DESC, updatedAt DESC, id ASC")
+    suspend fun getAllRoadmapsSync(): List<Roadmap>
+
+    @Query("SELECT * FROM roadmaps WHERE id = :id LIMIT 1")
+    suspend fun getRoadmapById(id: Long): Roadmap?
+
+    @Query("SELECT * FROM roadmap_nodes WHERE roadmapId = :roadmapId ORDER BY stepOrder ASC, id ASC")
+    fun getNodesForRoadmap(roadmapId: Long): Flow<List<RoadmapNode>>
+
+    @Query("SELECT * FROM roadmap_nodes WHERE roadmapId = :roadmapId ORDER BY stepOrder ASC, id ASC")
+    suspend fun getNodesForRoadmapSync(roadmapId: Long): List<RoadmapNode>
+
+    @Query("SELECT * FROM roadmap_nodes ORDER BY roadmapId ASC, stepOrder ASC, id ASC")
+    fun getAllNodes(): Flow<List<RoadmapNode>>
+
+    @Query("SELECT * FROM roadmap_nodes ORDER BY roadmapId ASC, stepOrder ASC, id ASC")
+    suspend fun getAllNodesSync(): List<RoadmapNode>
+
+    @Query("SELECT * FROM roadmap_nodes WHERE id = :id LIMIT 1")
+    suspend fun getNodeById(id: Long): RoadmapNode?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRoadmap(roadmap: Roadmap): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNodes(nodes: List<RoadmapNode>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNode(node: RoadmapNode): Long
+
+    @Update
+    suspend fun updateRoadmap(roadmap: Roadmap)
+
+    @Update
+    suspend fun updateNode(node: RoadmapNode)
+
+    @Query("UPDATE roadmap_nodes SET isCompleted = :completed WHERE id = :id")
+    suspend fun setNodeCompleted(id: Long, completed: Boolean)
+
+    @Query("UPDATE roadmap_nodes SET isCurrent = 0 WHERE roadmapId = :roadmapId")
+    suspend fun clearCurrentForRoadmap(roadmapId: Long)
+
+    @Query("UPDATE roadmap_nodes SET isCurrent = 1 WHERE id = :nodeId")
+    suspend fun setCurrentNode(nodeId: Long)
+
+    @Query("UPDATE roadmap_nodes SET checklistJson = :json WHERE id = :id")
+    suspend fun updateNodeChecklist(id: Long, json: String)
+
+    @Query("UPDATE roadmaps SET currentLevel = :currentLevel, progressPercentage = :progress, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateRoadmapProgress(id: Long, currentLevel: String, progress: Float, updatedAt: Long = System.currentTimeMillis())
+
+    @Delete
+    suspend fun deleteRoadmap(roadmap: Roadmap)
+
+    @Delete
+    suspend fun deleteNode(node: RoadmapNode)
+
+    @Query("DELETE FROM roadmaps WHERE id = :id")
+    suspend fun deleteRoadmapById(id: Long)
+
+    @Query("DELETE FROM roadmap_nodes WHERE id = :id")
+    suspend fun deleteNodeById(id: Long)
+
+    @Query("DELETE FROM roadmaps")
+    suspend fun clearAllRoadmaps()
+}
+

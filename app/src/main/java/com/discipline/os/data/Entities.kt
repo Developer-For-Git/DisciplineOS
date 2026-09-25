@@ -50,3 +50,43 @@ data class VideoEntry(
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "roadmaps")
+data class Roadmap(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val description: String = "",
+    val category: String = "Fitness", // "Fitness", "Coding", "Security", "Life"
+    val targetGoal: String = "", // e.g. "Clean Pull-up, Dip, Handstand, Muscle-Up"
+    val currentLevel: String = "Beginner (Level 0 - Foundation)",
+    val progressPercentage: Float = 0f,
+    val isPinned: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "roadmap_nodes",
+    foreignKeys = [
+        androidx.room.ForeignKey(
+            entity = Roadmap::class,
+            parentColumns = ["id"],
+            childColumns = ["roadmapId"],
+            onDelete = androidx.room.ForeignKey.CASCADE
+        )
+    ],
+    indices = [androidx.room.Index(value = ["roadmapId"])]
+)
+data class RoadmapNode(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val roadmapId: Long,
+    val stage: String, // e.g. "Phase 1: Foundation & Mindset", "Phase 2: The 4 Pillars"
+    val stepOrder: Int,
+    val title: String,
+    val description: String = "",
+    val repsOrCriteria: String = "",
+    val isCompleted: Boolean = false,
+    val isCurrent: Boolean = false,
+    val checklistJson: String = "[]" // JSON array: [{"text":"Wall Push-ups 3x15","done":false}]
+)
+

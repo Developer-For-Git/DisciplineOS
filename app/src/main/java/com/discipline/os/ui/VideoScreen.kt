@@ -2,6 +2,7 @@ package com.discipline.os.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.AltRoute
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
@@ -38,7 +40,8 @@ fun VideoScreen(
     onClearInitial: () -> Unit = {},
     onAddVideo: (title: String, url: String, category: String, reminderMs: Long, delayText: String, reminderType: String, notes: String) -> Unit,
     onToggleWatched: (VideoEntry) -> Unit,
-    onDeleteVideo: (VideoEntry) -> Unit
+    onDeleteVideo: (VideoEntry) -> Unit,
+    onOpenRoadmap: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var selectedCategoryFilter by remember { mutableStateOf("All") }
@@ -52,7 +55,7 @@ fun VideoScreen(
         }
     }
 
-    val categories = listOf("All", "Coding", "Security", "Mandarin", "College", "Mindset")
+    val categories = listOf("All", "Calisthenics", "Coding", "Security", "Mandarin", "College", "Mindset")
 
     val filteredVideos = remember(videos, selectedCategoryFilter, selectedTabFilter) {
         videos.filter { video ->
@@ -227,7 +230,8 @@ fun VideoScreen(
                         } catch (_: Exception) {}
                     },
                     onToggleWatched = { onToggleWatched(video) },
-                    onDelete = { onDeleteVideo(video) }
+                    onDelete = { onDeleteVideo(video) },
+                    onOpenRoadmap = onOpenRoadmap
                 )
             }
         }
@@ -255,7 +259,8 @@ fun ModernVideoCard(
     video: VideoEntry,
     onWatchClick: () -> Unit,
     onToggleWatched: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenRoadmap: () -> Unit = {}
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CardWhite),
@@ -336,6 +341,69 @@ fun ModernVideoCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            val isCalisthenics = video.title.contains("Calisthenics", ignoreCase = true) ||
+                video.category.equals("Calisthenics", ignoreCase = true) ||
+                video.url.contains("7qvOgQqeeYc")
+            if (isCalisthenics) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onOpenRoadmap() },
+                    color = CardElevated,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, BorderSubtle)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(PrimaryActionBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.AltRoute,
+                                    contentDescription = null,
+                                    tint = PrimaryActionFg,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "OPEN ROADMAP PROTOCOL",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TextPrimary,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = "4 Pillars, 5-12 Reps & 30-Day Plan",
+                                    fontSize = 11.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -502,6 +570,28 @@ fun ModernAddVideoDialog(
                         cursorColor = PrimaryActionBg
                     )
                 )
+
+                Text("Category:", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.SemiBold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(listOf("Calisthenics", "Coding", "Security", "Mandarin", "College", "Mindset")) { cat ->
+                        val isSel = category.equals(cat, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (isSel) PrimaryActionBg else CanvasBg)
+                                .border(1.dp, if (isSel) PrimaryActionBg else BorderSubtle, CircleShape)
+                                .clickable { category = cat }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = cat,
+                                color = if (isSel) PrimaryActionFg else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
 
                 Text("Remind me in:", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.SemiBold)
                 Row(

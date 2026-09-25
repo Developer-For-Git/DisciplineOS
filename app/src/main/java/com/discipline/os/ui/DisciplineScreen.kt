@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
@@ -58,7 +59,8 @@ fun DisciplineScreen(
     onDeleteTask: (Task) -> Unit,
     onAddTask: (String, String, String, Int, String, Boolean) -> Unit,
     onShowHistory: () -> Unit = {},
-    onOpenAi: () -> Unit = {}
+    onOpenAi: () -> Unit = {},
+    onOpenRoadmap: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
@@ -372,6 +374,32 @@ fun DisciplineScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                // Roadmap Button
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(PrimaryActionBg)
+                                        .clickable { onOpenRoadmap() }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.AltRoute,
+                                            contentDescription = "Roadmap",
+                                            tint = PrimaryActionFg,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Roadmap",
+                                            color = PrimaryActionFg,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
                                 // Past Days History Button
                                 Box(
                                     modifier = Modifier
