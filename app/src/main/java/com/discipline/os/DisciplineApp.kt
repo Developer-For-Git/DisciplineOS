@@ -30,6 +30,13 @@ class DisciplineApp : Application() {
 
         // 4. Ensure defaults seeded, check 24-hour midnight auto-reset & schedule alarms
         CoroutineScope(Dispatchers.IO).launch {
+            // One-time purge of all past/test daily logs so user tracking begins freshly from today
+            val prefs = getSharedPreferences("discipline_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("history_clean_slate_v1", false)) {
+                db.dailyLogDao().clearAllLogs()
+                prefs.edit().putBoolean("history_clean_slate_v1", true).apply()
+            }
+
             AppDatabase.seedDefaultData(db)
             checkAndPerformDailyReset(db)
             scheduleAllAlarms(db)

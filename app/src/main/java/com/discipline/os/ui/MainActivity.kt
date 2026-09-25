@@ -354,6 +354,11 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onShowHistory = {
                                     showHistoryDialog = true
+                                },
+                                onClearHistory = {
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        dailyLogDao.clearAllLogs()
+                                    }
                                 }
                             )
                         }

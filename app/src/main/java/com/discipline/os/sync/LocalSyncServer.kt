@@ -626,6 +626,31 @@ object LocalSyncServer {
                     }.toString()
                 }
 
+                // 17.6 Clear Past Days History & Progress
+                (path == "/api/history/clear" || path == "/api/logs/clear") && (method == "POST" || method == "DELETE") -> {
+                    logDao.clearAllLogs()
+                    responseJson = JSONObject().apply {
+                        put("success", true)
+                        put("message", "All past days progress and history logs cleared")
+                    }.toString()
+                }
+
+                // 17.7 Get Past Days History Logs
+                (path == "/api/history" || path == "/api/logs") && method == "GET" -> {
+                    val logs = logDao.getAllLogsSync()
+                    val arr = JSONArray()
+                    for (l in logs) {
+                        arr.put(JSONObject().apply {
+                            put("date", l.date)
+                            put("completedCount", l.completedCount)
+                            put("totalCount", l.totalCount)
+                            put("percentage", l.percentage)
+                            put("tasksSnapshotJson", l.tasksSnapshotJson)
+                        })
+                    }
+                    responseJson = arr.toString()
+                }
+
                 // 18. Trigger Vibration / Alarm Test
                 path == "/api/test-alarm" && method == "POST" -> {
                     com.discipline.os.alarm.VibrationHelper.triggerRapidVibration(context)

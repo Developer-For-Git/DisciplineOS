@@ -48,7 +48,8 @@ fun SystemScreen(
     is24Hour: Boolean = false,
     onToggleTimeFormat: () -> Unit = {},
     onDeduplicateData: () -> Unit,
-    onShowHistory: () -> Unit = {}
+    onShowHistory: () -> Unit = {},
+    onClearHistory: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -409,6 +410,26 @@ fun SystemScreen(
                         fontSize = 13.sp,
                         lineHeight = 18.sp
                     )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Text(
+                            text = "Reset All History Logs",
+                            color = AccentFlame,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable {
+                                    onClearHistory()
+                                    Toast.makeText(context, "All past history logs cleared!", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(vertical = 4.dp, horizontal = 6.dp)
+                        )
+                    }
                 }
             }
         }

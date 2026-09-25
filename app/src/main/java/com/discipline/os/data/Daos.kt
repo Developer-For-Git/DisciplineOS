@@ -82,6 +82,9 @@ interface DailyLogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(log: DailyLog)
+
+    @Query("DELETE FROM daily_logs")
+    suspend fun clearAllLogs()
 }
 
 @Dao
