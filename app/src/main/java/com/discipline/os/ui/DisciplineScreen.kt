@@ -370,73 +370,90 @@ fun DisciplineScreen(
                                 letterSpacing = 1.2.sp
                             )
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            // Heart / Pulse button
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(SecondaryActionBg)
+                                    .border(1.dp, BorderSubtle, CircleShape)
+                                    .clickable { VibrationHelper.triggerRapidVibration(context) },
+                                contentAlignment = Alignment.Center
                             ) {
-                                // Roadmap Button
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(PrimaryActionBg)
-                                        .clickable { onOpenRoadmap() }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.AltRoute,
-                                            contentDescription = "Roadmap",
-                                            tint = PrimaryActionFg,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Roadmap",
-                                            color = PrimaryActionFg,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = "Pulse",
+                                    tint = AccentFlame,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
 
-                                // Past Days History Button
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(AccentCyanSoft)
-                                        .border(1.dp, AccentCyan.copy(alpha = 0.35f), CircleShape)
-                                        .clickable { onShowHistory() }
-                                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(text = "📊", fontSize = 11.sp)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Past Days",
-                                            color = AccentCyan,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                                // Heart / Pulse button
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(CanvasBg)
-                                        .border(1.dp, BorderSubtle, CircleShape)
-                                        .clickable { VibrationHelper.triggerRapidVibration(context) },
-                                    contentAlignment = Alignment.Center
+                        // Dedicated Action Row: Roadmap & Past Days History
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Roadmap Button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(CircleShape)
+                                    .background(PrimaryActionBg)
+                                    .clickable { onOpenRoadmap() }
+                                    .padding(vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Favorite,
-                                        contentDescription = "Pulse",
-                                        tint = AccentFlame,
-                                        modifier = Modifier.size(18.dp)
+                                        imageVector = Icons.AutoMirrored.Filled.AltRoute,
+                                        contentDescription = "Roadmap",
+                                        tint = PrimaryActionFg,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "Roadmap",
+                                        color = PrimaryActionFg,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            // Past Days History Button
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(CircleShape)
+                                    .background(SecondaryActionBg)
+                                    .border(1.dp, BorderSubtle, CircleShape)
+                                    .clickable { onShowHistory() }
+                                    .padding(vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = "Past Days",
+                                        tint = TextPrimary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "Past Days",
+                                        color = TextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
