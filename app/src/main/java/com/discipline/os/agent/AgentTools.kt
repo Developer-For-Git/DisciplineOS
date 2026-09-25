@@ -125,6 +125,18 @@ object AgentTools {
             ))
 
             put(buildToolObj(
+                name = "delete_fuel",
+                description = "Delete a specific fuel/vow entry or the last logged fuel from the Prove Them Wrong vault.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Person/incident keyword, vow text, ID, or 'last' / 'it' to delete the most recent fuel")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
                 name = "add_video",
                 description = "Save an educational/high-value YouTube or study video to the Vault with an optional alert reminder.",
                 properties = JSONObject().apply {
@@ -273,7 +285,59 @@ object AgentTools {
                         put("description", "Target reps or qualification criteria")
                     })
                 },
-                required = listOf("roadmapQuery", "stage", "title")
+                required = listOf("roadmapQuery", "title")
+            ))
+
+            put(buildToolObj(
+                name = "delete_roadmap_step",
+                description = "Delete a milestone, exercise, or progression step from a roadmap.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Milestone title, step keyword, or ID to delete")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
+                name = "delete_roadmap",
+                description = "Delete an entire custom roadmap journey and all its steps.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Roadmap title keyword or ID to delete")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
+                name = "create_full_roadmap",
+                description = "Design, generate, and store a complete multi-step roadmap journey into the database.",
+                properties = JSONObject().apply {
+                    put("title", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Roadmap title (e.g. 'Python Backend Architecture')")
+                    })
+                    put("category", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Category (Coding, Fitness, Mindset, etc.)")
+                    })
+                    put("description", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Clear purpose describing what this roadmap is for")
+                    })
+                    put("targetGoal", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Target mastery goal")
+                    })
+                    put("stepsJson", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "JSON array of steps, each with stage, title, description, repsOrCriteria")
+                    })
+                },
+                required = listOf("title", "stepsJson")
             ))
         }
     }
@@ -505,7 +569,60 @@ object AgentTools {
                             toolName = toolName,
                             success = false,
                             summary = "Could not find protocol \"$query\" to delete",
-                            outputJson = "{\"error\": \"Protocol not found: $query\"}"
+                            outputJson = JSONObject().apply {
+                                put("success", false)
+                                put("error", "Protocol not found matching: $query")
+                            }.toString()
+                        )
+                    }
+                }
+
+                "delete_fuel" -> {
+                    val query = args.optString("query", "").trim()
+                    val allFuel = fuelDao.getAllFuelSync()
+
+                    val isRelative = query.isBlank() ||
+                        query.equals("last", ignoreCase = true) ||
+                        query.equals("it", ignoreCase = true) ||
+                        query.equals("that", ignoreCase = true) ||
+                        query.equals("this", ignoreCase = true) ||
+                        query.contains("just added", ignoreCase = true)
+
+                    val target = if (isRelative) {
+                        allFuel.firstOrNull() // Ordered by timestamp DESC
+                    } else {
+                        allFuel.find {
+                            it.id.toString() == query ||
+                            it.personOrIncident.contains(query, ignoreCase = true) ||
+                            it.defianceVow.contains(query, ignoreCase = true)
+                        } ?: allFuel.find { f ->
+                            val queryWords = query.lowercase().split("\\s+".toRegex())
+                                .filter { it.length > 2 && it !in listOf("the", "fuel", "delete", "remove", "entry", "vow", "now") }
+                            queryWords.isNotEmpty() && queryWords.any { w -> f.personOrIncident.contains(w, ignoreCase = true) }
+                        }
+                    }
+
+                    if (target != null) {
+                        fuelDao.deleteFuel(target)
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Deleted fuel entry: \"${target.personOrIncident}\"",
+                            outputJson = JSONObject().apply {
+                                put("success", true)
+                                put("deletedId", target.id)
+                                put("personOrIncident", target.personOrIncident)
+                            }.toString()
+                        )
+                    } else {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Fuel entry matching \"$query\" not found in vault",
+                            outputJson = JSONObject().apply {
+                                put("success", false)
+                                put("error", "Fuel entry not found matching: $query")
+                            }.toString()
                         )
                     }
                 }
@@ -894,6 +1011,149 @@ object AgentTools {
                             }.toString()
                         )
                     }
+                }
+
+                "delete_roadmap_step" -> {
+                    val query = args.optString("query", "").trim()
+                    val allNodes = roadmapDao.getAllNodesSync()
+
+                    val isRelative = query.isBlank() ||
+                        query.equals("last", ignoreCase = true) ||
+                        query.equals("it", ignoreCase = true) ||
+                        query.equals("that", ignoreCase = true)
+
+                    val target = if (isRelative) {
+                        allNodes.maxByOrNull { it.id }
+                    } else {
+                        allNodes.find {
+                            it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                        } ?: allNodes.find { n ->
+                            val queryWords = query.lowercase().split("\\s+".toRegex())
+                                .filter { it.length > 2 && it !in listOf("the", "step", "delete", "remove", "node", "milestone", "roadmap") }
+                            queryWords.isNotEmpty() && queryWords.any { w -> n.title.contains(w, ignoreCase = true) }
+                        }
+                    }
+
+                    if (target != null) {
+                        roadmapDao.deleteNode(target)
+                        val nodes = roadmapDao.getNodesForRoadmapSync(target.roadmapId)
+                        val compCount = nodes.count { it.isCompleted }
+                        val prog = if (nodes.isNotEmpty()) (compCount.toFloat() / nodes.size) * 100f else 0f
+                        val roadmap = roadmapDao.getRoadmapById(target.roadmapId)
+                        if (roadmap != null) {
+                            roadmapDao.updateRoadmapProgress(roadmap.id, roadmap.currentLevel, prog)
+                        }
+
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Deleted milestone: \"${target.title}\"",
+                            outputJson = JSONObject().apply {
+                                put("success", true)
+                                put("deletedId", target.id)
+                                put("title", target.title)
+                            }.toString()
+                        )
+                    } else {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Milestone matching \"$query\" not found in roadmap",
+                            outputJson = JSONObject().apply {
+                                put("success", false)
+                                put("error", "Milestone not found matching: $query")
+                            }.toString()
+                        )
+                    }
+                }
+
+                "delete_roadmap" -> {
+                    val query = args.optString("query", "").trim()
+                    val allRoadmaps = roadmapDao.getAllRoadmapsSync()
+                    val target = allRoadmaps.find {
+                        it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                    }
+
+                    if (target != null) {
+                        roadmapDao.deleteRoadmap(target)
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Deleted roadmap: \"${target.title}\"",
+                            outputJson = JSONObject().apply {
+                                put("success", true)
+                                put("deletedId", target.id)
+                                put("title", target.title)
+                            }.toString()
+                        )
+                    } else {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Roadmap matching \"$query\" not found",
+                            outputJson = JSONObject().apply {
+                                put("success", false)
+                                put("error", "Roadmap not found matching: $query")
+                            }.toString()
+                        )
+                    }
+                }
+
+                "create_full_roadmap" -> {
+                    val title = args.optString("title", "Custom Roadmap").trim()
+                    val category = args.optString("category", "General").trim()
+                    val desc = args.optString("description", "").trim()
+                    val targetGoal = args.optString("targetGoal", "").trim()
+                    val stepsJson = args.optString("stepsJson", "[]").trim()
+
+                    val newRoadmapId = roadmapDao.insertRoadmap(
+                        Roadmap(
+                            title = title,
+                            category = category,
+                            description = desc,
+                            targetGoal = targetGoal
+                        )
+                    )
+
+                    val stepsArray = try { JSONArray(stepsJson) } catch (_: Exception) { JSONArray() }
+                    val nodesToInsert = mutableListOf<RoadmapNode>()
+                    for (i in 0 until stepsArray.length()) {
+                        val s = stepsArray.getJSONObject(i)
+                        nodesToInsert.add(
+                            RoadmapNode(
+                                roadmapId = newRoadmapId,
+                                stage = s.optString("stage", "Phase 1"),
+                                stepOrder = i + 1,
+                                title = s.optString("title", "Step ${i + 1}"),
+                                description = s.optString("description", ""),
+                                repsOrCriteria = s.optString("repsOrCriteria", s.optString("criteria", "")),
+                                isCompleted = false,
+                                isCurrent = (i == 0)
+                            )
+                        )
+                    }
+
+                    if (nodesToInsert.isNotEmpty()) {
+                        roadmapDao.insertNodes(nodesToInsert)
+                        roadmapDao.updateRoadmapProgress(
+                            id = newRoadmapId,
+                            currentLevel = "${nodesToInsert[0].stage}: ${nodesToInsert[0].title}",
+                            progress = 0f
+                        )
+                    }
+
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Designed roadmap '$title' with ${nodesToInsert.size} progression steps",
+                        outputJson = JSONObject().apply {
+                            put("success", true)
+                            put("roadmapId", newRoadmapId)
+                            put("title", title)
+                            put("category", category)
+                            put("totalSteps", nodesToInsert.size)
+                        }.toString()
+                    )
                 }
 
                 else -> {

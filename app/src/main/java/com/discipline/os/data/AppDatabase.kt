@@ -637,6 +637,83 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                 }
             }
+
+            // Seed second foundational roadmap (Low-Level Systems & Deep Work Architecture) if not present
+            val hasSystemsRoadmap = existingRoadmaps.any {
+                it.title.contains("Systems", ignoreCase = true) || it.title.contains("Deep Work", ignoreCase = true)
+            }
+            if (!hasSystemsRoadmap) {
+                val systemsId = roadmapDao.insertRoadmap(
+                    Roadmap(
+                        title = "Low-Level Systems & Deep Work Architecture",
+                        category = "Engineering",
+                        description = "Master low-level systems programming (C, x86/ARM Assembly, OS kernel internals) paired with non-negotiable daily deep focus blocks.",
+                        targetGoal = "Build custom bare-metal modules & master computer architecture from silicon to kernel.",
+                        currentLevel = "Phase 1: Deep Focus Sprint",
+                        progressPercentage = 0f,
+                        isPinned = false
+                    )
+                )
+
+                val systemsNodes = listOf(
+                    RoadmapNode(
+                        roadmapId = systemsId,
+                        stage = "Phase 1: Deep Work Discipline",
+                        stepOrder = 1,
+                        title = "Step 1: 90-Minute Uninterrupted Focus Sprint",
+                        description = "Eliminate phone notifications, brain fog, and context switching. Single-task on high-leverage technical problem solving.",
+                        repsOrCriteria = "90 min single-tasking flow state",
+                        isCompleted = false,
+                        isCurrent = true,
+                        checklistJson = """[{"text":"Phone in another room or do-not-disturb","done":false},{"text":"Define 1 single objective before timer starts","done":false},{"text":"Zero social media / browser distractions","done":false},{"text":"Review code and document findings after 90m","done":false}]"""
+                    ),
+                    RoadmapNode(
+                        roadmapId = systemsId,
+                        stage = "Phase 1: Deep Work Discipline",
+                        stepOrder = 2,
+                        title = "Step 2: C Fundamentals & Pointer Memory Model",
+                        description = "Understand stack vs heap, pointer arithmetic, struct memory alignment, and cache-friendly data layouts.",
+                        repsOrCriteria = "Build custom dynamic array in C",
+                        isCompleted = false,
+                        isCurrent = false,
+                        checklistJson = """[{"text":"Pointer dereferencing & double pointers (int**)","done":false},{"text":"Manual memory management: malloc, calloc, realloc, free","done":false},{"text":"Valgrind memory leak check (0 bytes leaked)","done":false}]"""
+                    ),
+                    RoadmapNode(
+                        roadmapId = systemsId,
+                        stage = "Phase 2: Low-Level Systems",
+                        stepOrder = 3,
+                        title = "Step 3: x86_64 & ARM Assembly Foundations",
+                        description = "Inspect compiler output (objdump/gcc -S). Understand CPU registers (RAX, RBX, RSP, RBP), stack frames, and syscall ABI conventions.",
+                        repsOrCriteria = "Write standalone assembly program",
+                        isCompleted = false,
+                        isCurrent = false,
+                        checklistJson = """[{"text":"Write 'Hello World' using raw sys_write syscall in assembly","done":false},{"text":"Inspect function prologue and epilogue stack frames","done":false},{"text":"Implement fast string reversal in pure assembly","done":false}]"""
+                    ),
+                    RoadmapNode(
+                        roadmapId = systemsId,
+                        stage = "Phase 2: Low-Level Systems",
+                        stepOrder = 4,
+                        title = "Step 4: Linux OS Kernel Internals & Virtual Memory",
+                        description = "Process memory mapping (proc/pid/maps), virtual page tables, MMU, context switching, and POSIX multithreading.",
+                        repsOrCriteria = "Implement custom multithreaded worker pool",
+                        isCompleted = false,
+                        isCurrent = false,
+                        checklistJson = """[{"text":"Inspect process virtual address space via /proc","done":false},{"text":"Implement pthreads mutex lock-free ring buffer","done":false},{"text":"Trace syscall latency using strace / perf","done":false}]"""
+                    ),
+                    RoadmapNode(
+                        roadmapId = systemsId,
+                        stage = "Phase 3: Elite Architecture",
+                        stepOrder = 5,
+                        title = "Step 5: Custom Bare-Metal Kernel & Bootloader",
+                        description = "Write a minimal x86 16-bit real-mode bootloader, transition into 32-bit protected mode, and output VGA text buffer without standard libraries.",
+                        repsOrCriteria = "Boot custom kernel in QEMU",
+                        isCompleted = false,
+                        isCurrent = false,
+                        checklistJson = """[{"text":"Write 512-byte MBR bootloader ending with 0xAA55","done":false},{"text":"Enable A20 line & load Global Descriptor Table (GDT)","done":false},{"text":"Switch to 32-bit protected mode and write to 0xB8000","done":false}]"""
+                    )
+                )
+                roadmapDao.insertNodes(systemsNodes)
+            }
         }
     }
 }

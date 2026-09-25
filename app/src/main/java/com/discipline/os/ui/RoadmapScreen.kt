@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,8 +59,14 @@ fun RoadmapScreen(
     val context = LocalContext.current
     val colors = AppTheme.colors
 
-    var selectedRoadmapId by remember(roadmaps) {
+    var selectedRoadmapId by rememberSaveable {
         mutableStateOf(roadmaps.firstOrNull()?.id ?: 0L)
+    }
+
+    LaunchedEffect(roadmaps) {
+        if (selectedRoadmapId == 0L || roadmaps.none { it.id == selectedRoadmapId }) {
+            selectedRoadmapId = roadmaps.firstOrNull()?.id ?: 0L
+        }
     }
 
     val currentRoadmap = remember(roadmaps, selectedRoadmapId) {
@@ -180,35 +187,241 @@ fun RoadmapScreen(
             }
         }
 
-        // 2. Roadmap Switcher Tabs (if more than 1 roadmap exists)
-        if (roadmaps.size > 1) {
-            item {
+        // 2. Divided Roadmap Tracks Showcase (Divided Roadmaps with Explicit Purpose & Description)
+        item {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DIVIDED ROADMAP TRACKS (${roadmaps.size})",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textMuted,
+                        letterSpacing = 1.sp
+                    )
+                    if (roadmaps.size > 1) {
+                        Text(
+                            text = "Swipe to explore tracks →",
+                            fontSize = 10.sp,
+                            color = colors.textMuted
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    roadmaps.forEach { rm ->
+                    roadmaps.forEachIndexed { index, rm ->
                         val isSelected = rm.id == currentRoadmap?.id
+                        val rmNodes = nodes.filter { it.roadmapId == rm.id }
+                        val rmCompleted = rmNodes.count { it.isCompleted }
+                        val rmTotal = rmNodes.size
+                        val rmProgress = if (rmTotal > 0) rmCompleted.toFloat() / rmTotal else 0f
+
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) colors.primaryActionBg else colors.cardBg)
+                                .width(285.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(if (isSelected) colors.cardElevated else colors.cardBg)
                                 .border(
-                                    1.dp,
-                                    if (isSelected) colors.primaryActionBg else colors.borderSubtle,
-                                    RoundedCornerShape(10.dp)
+                                    if (isSelected) 1.5.dp else 1.dp,
+                                    if (isSelected) colors.textPrimary else colors.borderSubtle,
+                                    RoundedCornerShape(18.dp)
                                 )
                                 .clickable { selectedRoadmapId = rm.id }
-                                .padding(horizontal = 14.dp, vertical = 7.dp)
+                                .padding(14.dp)
                         ) {
-                            Text(
-                                text = rm.title,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) colors.primaryActionFg else colors.textSecondary
-                            )
+                            Column {
+                                // Top row: Track # & Category & Status
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(if (isSelected) colors.primaryActionBg else colors.cardElevated)
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "TRACK 0${index + 1}",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) colors.primaryActionFg else colors.textSecondary
+                                            )
+                                        }
+
+                                        Text(
+                                            text = rm.category.uppercase(),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.textMuted
+                                        )
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(colors.primaryActionBg)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "ACTIVE",
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = colors.primaryActionFg
+                                                )
+                                            }
+                                        }
+                                        if (roadmaps.size > 1 && !rm.title.contains("Calisthenics", ignoreCase = true)) {
+                                            IconButton(
+                                                onClick = { onDeleteRoadmap(rm) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.DeleteOutline,
+                                                    contentDescription = "Delete Roadmap",
+                                                    tint = colors.textMuted,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Roadmap Title
+                                Text(
+                                    text = rm.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // What this roadmap is for (Showcase Description)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(colors.canvasBg.copy(alpha = 0.5f))
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(8.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "WHAT THIS ROADMAP IS FOR:",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.textMuted
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = if (rm.description.isNotBlank()) rm.description else "Custom progression architecture.",
+                                            fontSize = 11.5.sp,
+                                            color = colors.textSecondary,
+                                            lineHeight = 15.sp,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                if (rm.targetGoal.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Flag,
+                                            contentDescription = null,
+                                            tint = colors.textSecondary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Target: ${rm.targetGoal}",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            color = colors.textSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Progress & Action Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "$rmCompleted/$rmTotal Milestones (${(rmProgress * 100).toInt()}%)",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.5.sp,
+                                        color = colors.textMuted
+                                    )
+
+                                    if (!isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(colors.primaryActionBg)
+                                                .clickable { selectedRoadmapId = rm.id }
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "Select Track →",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = colors.primaryActionFg
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                LinearProgressIndicator(
+                                    progress = { rmProgress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = if (isSelected) colors.textPrimary else colors.textMuted,
+                                    trackColor = colors.cardBg
+                                )
+                            }
                         }
                     }
                 }

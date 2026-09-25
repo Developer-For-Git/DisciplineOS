@@ -474,8 +474,50 @@ class AiAgentEngine(
                     "✅ **Protocol Created Successfully**\n\n• **Task:** $title\n• **Scheduled Time:** $time\n• **Alarm:** Armed\n\n*Execute without hesitation.*"
                 }
                 "delete_protocol" -> {
-                    val title = obj.optString("title", "Protocol")
-                    "🗑️ **Protocol Deleted Successfully**\n\n• **Task:** \"$title\"\n• **Status:** Disarmed & removed from routine."
+                    val isSuccess = obj.optBoolean("success", true)
+                    if (!isSuccess || obj.has("error")) {
+                        val err = obj.optString("error", "Protocol not found matching query")
+                        "⚠️ **Could Not Delete Protocol**\n\n$err. Your routine was untouched."
+                    } else {
+                        val title = obj.optString("title", "Protocol")
+                        "🗑️ **Protocol Deleted Successfully**\n\n• **Task:** \"$title\"\n• **Status:** Disarmed & removed from routine."
+                    }
+                }
+                "delete_fuel" -> {
+                    val isSuccess = obj.optBoolean("success", true)
+                    if (!isSuccess || obj.has("error")) {
+                        val err = obj.optString("error", "Fuel entry not found")
+                        "⚠️ **Could Not Delete Fuel**\n\n$err. No entries were removed from the vault."
+                    } else {
+                        val person = obj.optString("personOrIncident", "Fuel Entry")
+                        "🗑️ **Fuel Entry Erased From Vault**\n\n• **Removed:** \"$person\"\n• **Status:** Cleared from Prove Them Wrong records."
+                    }
+                }
+                "delete_roadmap_step" -> {
+                    val isSuccess = obj.optBoolean("success", true)
+                    if (!isSuccess || obj.has("error")) {
+                        val err = obj.optString("error", "Milestone not found")
+                        "⚠️ **Could Not Delete Milestone**\n\n$err. Roadmap was untouched."
+                    } else {
+                        val title = obj.optString("title", "Milestone")
+                        "🗑️ **Roadmap Milestone Deleted**\n\n• **Milestone:** \"$title\"\n• **Status:** Removed from roadmap journey."
+                    }
+                }
+                "delete_roadmap" -> {
+                    val isSuccess = obj.optBoolean("success", true)
+                    if (!isSuccess || obj.has("error")) {
+                        val err = obj.optString("error", "Roadmap not found")
+                        "⚠️ **Could Not Delete Roadmap**\n\n$err."
+                    } else {
+                        val title = obj.optString("title", "Roadmap")
+                        "🗑️ **Roadmap Journey Erased**\n\n• **Journey:** \"$title\"\n• **Status:** Deleted alongside all milestone nodes."
+                    }
+                }
+                "create_full_roadmap" -> {
+                    val title = obj.optString("title", "Custom Roadmap")
+                    val cat = obj.optString("category", "General")
+                    val steps = obj.optInt("totalSteps", 0)
+                    "🗺️ **Roadmap Journey Architecture Designed & Initialized**\n\n• **Journey:** $title ($cat)\n• **Generated Milestones:** $steps progressive stages\n\n*Saved to database! Open Roadmap tab to view your complete skill tree.*"
                 }
                 "add_roadmap_step" -> {
                     val title = obj.optString("title", "Milestone")
@@ -570,34 +612,136 @@ class AiAgentEngine(
             ?: ModelDownloadManager.findExistingModelFile(context, settings.customBaseUrl)
         val sizeMb = modelFile?.let { it.length() / (1024 * 1024) } ?: 0L
 
-        // 1. PROTOCOL DELETION / UNDO (Check this FIRST so deletion requests are never mistaken for additions)
-        val isDelete = lowerMsg.startsWith("/delete") ||
+        // Find the last tool that was executed in previous turns for context-aware relative actions
+        val lastExecutedTool = chatHistory.asReversed().mapNotNull { msg ->
+            if (msg.role == "tool") msg.toolResult?.toolName else null
+        }.firstOrNull()
+
+        // 1. SECTION-SPECIFIC DELETION / UNDO
+        // 1A. Fuel Section Deletion (e.g. "/fuel delete test", "delete fuel entry", "remove from fuel")
+        val isFuelDelete = (lowerMsg.startsWith("/fuel") && (lowerMsg.contains("delete") || lowerMsg.contains("remove") || lowerMsg.contains("clear"))) ||
+                ((lowerMsg.contains("fuel") || lowerMsg.contains("vow")) && (lowerMsg.contains("delete") || lowerMsg.contains("remove")))
+        if (isFuelDelete) {
+            var query = lowerMsg.replace("/fuel", "")
+                .replace("delete", "")
+                .replace("remove", "")
+                .replace("clear", "")
+                .replace("from fuel", "")
+                .replace("in fuel", "")
+                .replace("fuel", "")
+                .replace("entry", "")
+                .replace("vow", "")
+                .replace("the", "")
+                .trim()
+            if (query.isBlank() || query == "it" || query == "that" || query == "this") query = "last"
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "delete_fuel",
+                argumentsJson = JSONObject().apply {
+                    put("query", query)
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Erasing from Prove Them Wrong vault with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 1B. Roadmap Section Deletion (e.g. "/roadmap delete push-ups", "delete from roadmap", "remove roadmap step")
+        val isRoadmapDelete = (lowerMsg.startsWith("/roadmap") && (lowerMsg.contains("delete") || lowerMsg.contains("remove"))) ||
+                (lowerMsg.contains("roadmap") && (lowerMsg.contains("delete") || lowerMsg.contains("remove")))
+        if (isRoadmapDelete) {
+            var query = lowerMsg.replace("/roadmap", "")
+                .replace("delete", "")
+                .replace("remove", "")
+                .replace("from roadmap", "")
+                .replace("on roadmap", "")
+                .replace("in roadmap", "")
+                .replace("roadmap", "")
+                .replace("step", "")
+                .replace("milestone", "")
+                .replace("the", "")
+                .trim()
+            if (query.isBlank() || query == "it" || query == "that" || query == "this") query = "last"
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "delete_roadmap_step",
+                argumentsJson = JSONObject().apply {
+                    put("query", query)
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Removing milestone from roadmap with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 1C. Generic Deletion & Pronoun / Relative Deletion ("delete it", "now delete it", "delete task")
+        val isGenericDelete = lowerMsg.startsWith("/delete") ||
+                lowerMsg.startsWith("/protocol delete") ||
                 lowerMsg.contains("delete") ||
                 lowerMsg.contains("remove") ||
                 lowerMsg.contains("cancel task") ||
                 lowerMsg.contains("clear task") ||
                 lowerMsg.contains("undo") ||
                 lowerMsg.contains("erase")
-        if (isDelete) {
-            // Find what was previously added in chat history if user references "it", "that", "last", or "just added"
-            val lastAddedTitle = chatHistory.asReversed().mapNotNull { msg ->
-                if (msg.role == "tool" && msg.toolResult?.toolName == "add_protocol") {
-                    try { JSONObject(msg.content).optString("title") } catch (_: Exception) { null }
-                } else null
-            }.firstOrNull()
-
+        if (isGenericDelete) {
             val isRelative = lowerMsg.contains(" it") || lowerMsg.endsWith("it") ||
                     lowerMsg.contains(" that") || lowerMsg.endsWith("that") ||
                     lowerMsg.contains("last") || lowerMsg.contains("just added") ||
                     lowerMsg.contains("writ now") || lowerMsg.contains("right now") ||
                     lowerMsg.contains("added") || lowerMsg == "delete" || lowerMsg == "/delete"
 
-            val target = if (isRelative && lastAddedTitle != null) {
-                lastAddedTitle
+            // CONTEXT MEMORY: If the user just added fuel in the previous turn, delete fuel!
+            if (isRelative && lastExecutedTool == "add_fuel") {
+                val toolCall = ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "delete_fuel",
+                    argumentsJson = JSONObject().apply { put("query", "last") }.toString()
+                )
+                return ChatMessage(
+                    role = "assistant",
+                    content = "Erasing last added fuel entry with **${settings.modelName}**...",
+                    toolCalls = listOf(toolCall),
+                    modelName = settings.modelName
+                )
+            }
+
+            // CONTEXT MEMORY: If the user just added a roadmap step in the previous turn, delete roadmap step!
+            if (isRelative && lastExecutedTool == "add_roadmap_step") {
+                val toolCall = ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "delete_roadmap_step",
+                    argumentsJson = JSONObject().apply { put("query", "last") }.toString()
+                )
+                return ChatMessage(
+                    role = "assistant",
+                    content = "Removing last added roadmap milestone with **${settings.modelName}**...",
+                    toolCalls = listOf(toolCall),
+                    modelName = settings.modelName
+                )
+            }
+
+            // Otherwise: Protocol Deletion
+            val lastAddedProtocol = chatHistory.asReversed().mapNotNull { msg ->
+                if (msg.role == "tool" && msg.toolResult?.toolName == "add_protocol") {
+                    try { JSONObject(msg.content).optString("title") } catch (_: Exception) { null }
+                } else null
+            }.firstOrNull()
+
+            val target = if (isRelative && lastAddedProtocol != null) {
+                lastAddedProtocol
             } else if (isRelative) {
                 "last"
             } else {
                 lowerMsg.replace("/delete", "")
+                    .replace("/protocol", "")
                     .replace("delete", "")
                     .replace("remove", "")
                     .replace("cancel", "")
@@ -689,7 +833,72 @@ class AiAgentEngine(
             )
         }
 
-        // 3. ROADMAP SECTION INTENT (Calisthenics Pillars, Milestones, Progressions)
+        // 3A. FULL ROADMAP GENERATION & DESIGN (e.g. "design roadmap for C and Assembly", "create roadmap for handstand")
+        val isDesignRoadmap = lowerMsg.contains("design roadmap") ||
+                lowerMsg.contains("create roadmap") ||
+                lowerMsg.contains("build roadmap") ||
+                lowerMsg.contains("make a roadmap") ||
+                lowerMsg.contains("generate roadmap") ||
+                lowerMsg.contains("new roadmap")
+        if (isDesignRoadmap) {
+            val topic = lastUserMsg.replace(Regex("""(?i)(design|create|build|make a|generate|new)\s+roadmap\s+(for\s+)?"""), "")
+                .trim(' ', ':', '.', '!', '?')
+                .ifBlank { "Mastery Progression" }
+
+            val topicLower = topic.lowercase()
+            val category = when {
+                topicLower.contains("code") || topicLower.contains("c ") || topicLower.contains("assembly") || topicLower.contains("python") || topicLower.contains("hack") -> "Engineering"
+                topicLower.contains("calisthenic") || topicLower.contains("gym") || topicLower.contains("run") || topicLower.contains("push") -> "Fitness"
+                else -> "Mindset"
+            }
+
+            val steps = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("stage", "Phase 1: Foundations & Daily Rhythm")
+                    put("title", "Core Fundamentals & Baseline Assessment")
+                    put("description", "Establish prerequisite baseline metrics, terminology, and uninterrupted study/training habits.")
+                    put("criteria", "Daily 45-min non-negotiable block for 7 consecutive days")
+                })
+                put(JSONObject().apply {
+                    put("stage", "Phase 1: Foundations & Daily Rhythm")
+                    put("title", "Progressive Drills & Form Mechanics")
+                    put("description", "Execute structured technical exercises, debugging routines, and form-perfect executions.")
+                    put("criteria", "Complete 10 focused sessions with zero compromise")
+                })
+                put(JSONObject().apply {
+                    put("stage", "Phase 2: Intermediate Architecture")
+                    put("title", "High-Complexity Projects & Skill Combinations")
+                    put("description", "Bridge theory into brutal execution. Build real architectures or execute compound movements.")
+                    put("criteria", "100% adherence to quality standards and error-free execution")
+                })
+                put(JSONObject().apply {
+                    put("stage", "Phase 3: Elite Mastery")
+                    put("title", "Apex Specialization & Flow State Integration")
+                    put("description", "Master the edge cases, speed, autonomous execution, and compound mastery under load.")
+                    put("criteria", "Flawless demonstration without reference or hesitation")
+                })
+            }
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "create_full_roadmap",
+                argumentsJson = JSONObject().apply {
+                    put("title", topic.replaceFirstChar { it.uppercase() })
+                    put("category", category)
+                    put("description", "Complete progressive skill architecture for $topic. Structured across foundational, intermediate, and apex stages.")
+                    put("targetGoal", "Flawless mastery and elite execution in $topic")
+                    put("stepsJson", steps.toString())
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Designing and generating complete roadmap for **$topic** with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 3B. ROADMAP SECTION INTENT (Calisthenics Pillars, Milestones, Progressions)
         val isRoadmap = lowerMsg.startsWith("/roadmap") ||
                 lowerMsg.contains("roadmap") ||
                 lowerMsg.contains("calisthenic") ||
