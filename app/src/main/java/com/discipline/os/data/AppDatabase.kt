@@ -284,15 +284,13 @@ abstract class AppDatabase : RoomDatabase() {
                 } else if ((titleLower.contains("better than yesterday") || titleLower.contains("reflection") || task.category.equals("bedtime", true)) && (task.scheduledTime != "22:00" || task.sortOrder != 7)) {
                     updated = updated.copy(scheduledTime = "22:00", sortOrder = 7)
                 }
-                // Sanitize any existing personal student descriptions
-                if (updated.description.contains("Diploma CSE", ignoreCase = true) || updated.title.contains("Code with Harry", ignoreCase = true)) {
-                    if (updated.title.contains("Code with Harry", ignoreCase = true)) {
-                        updated = updated.copy(title = "Deep Work: Systems & Architecture (1 Hour)", description = "Daily technical growth. Never passively watch tutorials; always compile, benchmark, and debug code independently.")
-                    } else if (updated.title.contains("lecture", ignoreCase = true)) {
-                        updated = updated.copy(title = "Core Technical Deep Study & Lab Practice", description = "Core computer science fundamentals: Data Structures, Algorithms, and Operating Systems architecture.")
-                    } else if (updated.title.contains("homework", ignoreCase = true)) {
-                        updated = updated.copy(title = "Engineering Review & Project Implementation", description = "Stay ahead in core engineering subjects and systems architecture. Review daily progress and eliminate bottlenecks.")
-                    }
+                // Normalize legacy tasks to match new architecture
+                if (task.sortOrder == 2 && !task.title.contains("Systems & Architecture")) {
+                    updated = updated.copy(title = "Deep Work: Systems & Architecture (1 Hour)", description = "Daily technical growth. Never passively watch tutorials; always compile, benchmark, and debug code independently.", category = "Coding")
+                } else if (task.sortOrder == 3 && !task.title.contains("Technical Deep Study")) {
+                    updated = updated.copy(title = "Core Technical Deep Study & Lab Practice", description = "Core computer science fundamentals: Data Structures, Algorithms, and Operating Systems architecture.", category = "Study")
+                } else if (task.sortOrder == 4 && !task.title.contains("Engineering Review")) {
+                    updated = updated.copy(title = "Engineering Review & Project Implementation", description = "Stay ahead in core engineering subjects and systems architecture. Review daily progress and eliminate bottlenecks.", category = "Engineering")
                 }
                 if (updated != task) {
                     taskDao.updateTask(updated)
@@ -312,10 +310,11 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
 
-            // Sanitize any prior personal fuel entries from the database
+            // Sanitize any legacy fuel entries
             val allFuel = fuelDao.getAllFuelSync()
+            val validCategories = setOf("defiance", "critic", "skeptic", "doubter", "rival", "personal vow")
             for (f in allFuel) {
-                if (f.personOrIncident.contains("teacher", ignoreCase = true) || f.personOrIncident.contains("embarrassed", ignoreCase = true)) {
+                if (f.category.lowercase() !in validCategories || f.personOrIncident.contains("class", ignoreCase = true)) {
                     fuelDao.updateFuel(f.copy(
                         personOrIncident = "Naysayers & Skeptics",
                         defianceVow = "The best revenge is massive compounding success. Let unrelenting daily execution do all the talking.",
@@ -362,11 +361,11 @@ abstract class AppDatabase : RoomDatabase() {
             for (v in allVideos) {
                 var updated = v
                 val titleLower = v.title.lowercase()
-                if (titleLower.contains("c language") || titleLower.contains("codewithharry") || titleLower.contains("c programming")) {
+                if (v.url.contains("irqbmMNs2Bo") || titleLower.contains("c programming") || titleLower.contains("c language")) {
                     if (v.reminderDelayText.contains("20:00") || v.reminderDelayText.isBlank()) {
                         updated = updated.copy(reminderDelayText = "Tomorrow 07:30")
                     }
-                    if (v.title.contains("CodeWithHarry", ignoreCase = true)) {
+                    if (v.title != "C Programming & Low-Level Systems Foundations") {
                         updated = updated.copy(title = "C Programming & Low-Level Systems Foundations")
                     }
                 } else if (titleLower.contains("tryhackme") || titleLower.contains("network security")) {
