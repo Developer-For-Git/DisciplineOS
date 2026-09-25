@@ -753,19 +753,17 @@ fun AiSettingsDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.75f))
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(top = 16.dp, bottom = 72.dp),
+                .background(Color.Black.copy(alpha = 0.78f))
+                .padding(horizontal = 14.dp)
+                .padding(top = 36.dp, bottom = 96.dp),
             contentAlignment = Alignment.Center
         ) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(),
+                    .fillMaxHeight(0.85f),
                 color = colors.cardBg,
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(22.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderSubtle)
             ) {
                 Column(
@@ -1669,20 +1667,24 @@ fun AiSettingsDialog(
                         AiDialogScreen.TYPE_SELECT -> {
                             Button(
                                 onClick = onDismiss,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = colors.cardElevated),
-                                shape = RoundedCornerShape(10.dp)
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Close", color = colors.textPrimary)
+                                Text("Close", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                             }
                         }
                         AiDialogScreen.CLOUD_LIST -> {
                             OutlinedButton(
                                 onClick = { currentScreen = AiDialogScreen.TYPE_SELECT },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("Back to Architecture", color = colors.textSecondary)
+                                Text("← Back to Architecture", color = colors.textSecondary, fontWeight = FontWeight.Medium)
                             }
                         }
                         AiDialogScreen.PROVIDER_CONFIG -> {
@@ -1692,10 +1694,12 @@ fun AiSettingsDialog(
                             ) {
                                 OutlinedButton(
                                     onClick = { currentScreen = AiDialogScreen.CLOUD_LIST },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(10.dp)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("Back", color = colors.textSecondary)
+                                    Text("Back", color = colors.textSecondary, fontWeight = FontWeight.Medium)
                                 }
 
                                 Button(
@@ -1710,9 +1714,11 @@ fun AiSettingsDialog(
                                         Toast.makeText(context, "Activated ${selectedProvider.displayName}", Toast.LENGTH_SHORT).show()
                                         onDismiss()
                                     },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.primaryActionBg),
-                                    shape = RoundedCornerShape(10.dp)
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Text("Save & Activate", color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
                                 }
@@ -1725,19 +1731,23 @@ fun AiSettingsDialog(
                             ) {
                                 OutlinedButton(
                                     onClick = { currentScreen = AiDialogScreen.TYPE_SELECT },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(10.dp)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("Back to Architecture", color = colors.textSecondary)
+                                    Text("Back", color = colors.textSecondary, fontWeight = FontWeight.Medium)
                                 }
 
                                 Button(
                                     onClick = onDismiss,
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = colors.cardElevated),
-                                    shape = RoundedCornerShape(10.dp)
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("Done", color = colors.textPrimary)
+                                    Text("Done", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }

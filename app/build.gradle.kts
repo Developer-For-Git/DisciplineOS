@@ -13,8 +13,8 @@ android {
         applicationId = "com.discipline.os"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "2.10.0"
+        versionCode = 13
+        versionName = "2.11.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
