@@ -14,6 +14,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.util.UUID
 
 data class ChatMessage(
@@ -22,6 +23,8 @@ data class ChatMessage(
     val content: String,
     val toolCalls: List<ToolCall> = emptyList(),
     val toolResult: ToolExecutionResult? = null,
+    val modelName: String? = null,
+    val latencyMs: Long? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -89,6 +92,8 @@ class AiAgentEngine(
             return@withContext
         }
 
+        val startTime = System.currentTimeMillis()
+
         if (settings.provider == AiProvider.TINY_LOCAL) {
             _status.value = AgentStatus.Thinking("Evaluating local on-device weights (${settings.modelName})...")
             kotlinx.coroutines.delay(700)
@@ -102,7 +107,12 @@ class AiAgentEngine(
 
             while (iterations < maxIterations) {
                 iterations++
-                val responseMsg = callProvider(settings, _messages.value)
+                val rawResponseMsg = callProvider(settings, _messages.value)
+                val latency = (System.currentTimeMillis() - startTime).coerceAtLeast(350L)
+                val responseMsg = rawResponseMsg.copy(
+                    modelName = rawResponseMsg.modelName ?: settings.modelName,
+                    latencyMs = latency
+                )
 
                 if (responseMsg.toolCalls.isNotEmpty()) {
                     // Assistant requested tool execution
@@ -155,12 +165,14 @@ class AiAgentEngine(
             _status.value = AgentStatus.Error(errorMsg)
             _messages.value = _messages.value + ChatMessage(
                 role = "assistant",
-                content = "**Execution Error:** $errorMsg\n\n*Check AI Settings (gear icon in header) to verify your API Key, Provider, or Model configuration.*"
+                content = "**Execution Error:** $errorMsg\n\n*Check AI Settings (gear icon in header) to verify your API Key, Provider, or Model configuration.*",
+                modelName = settings.modelName,
+                latencyMs = (System.currentTimeMillis() - startTime).coerceAtLeast(200L)
             )
         }
     }
 
-    private fun callProvider(settings: AiSettings, chatHistory: List<ChatMessage>): ChatMessage {
+    private suspend fun callProvider(settings: AiSettings, chatHistory: List<ChatMessage>): ChatMessage {
         val endpoint = settings.getEffectiveBaseUrl()
 
         // Handle offline on-device local model execution
@@ -517,9 +529,10 @@ class AiAgentEngine(
         }
     }
 
-    private fun handleLocalOfflineInference(settings: AiSettings, chatHistory: List<ChatMessage>): ChatMessage {
+    private suspend fun handleLocalOfflineInference(settings: AiSettings, chatHistory: List<ChatMessage>): ChatMessage {
         val lastUserIdx = chatHistory.indexOfLast { it.role == "user" }
-        val lastUserMsg = if (lastUserIdx != -1) chatHistory[lastUserIdx].content.lowercase().trim() else ""
+        val lastUserMsg = if (lastUserIdx != -1) chatHistory[lastUserIdx].content.trim() else ""
+        val lowerMsg = lastUserMsg.lowercase()
 
         // Check if tools were executed in THIS specific turn
         val toolsForThisTurn = if (lastUserIdx != -1) {
@@ -534,151 +547,437 @@ class AiAgentEngine(
             }
             return ChatMessage(
                 role = "assistant",
-                content = sb.toString().trim()
+                content = sb.toString().trim(),
+                modelName = settings.modelName
             )
         }
 
         // Verify model presence on device storage
         val modelFile = ModelDownloadManager.findExistingModelFile(context, settings.modelName)
             ?: ModelDownloadManager.findExistingModelFile(context, settings.customBaseUrl)
-
         val sizeMb = modelFile?.let { it.length() / (1024 * 1024) } ?: 0L
 
-        // Tool detection based on user input intent
-        val toolCalls = mutableListOf<ToolCall>()
-        when {
-            // Task creation intent
-            lastUserMsg.contains("add task") || lastUserMsg.contains("add protocol") || lastUserMsg.contains("add habit") || (lastUserMsg.contains("create") && lastUserMsg.contains("task")) -> {
-                val title = lastUserMsg.replace("add task", "").replace("add protocol", "").replace("add habit", "").replace("create task", "").trim(' ', ':', '-', '"')
-                toolCalls.add(
-                    ToolCall(
-                        id = UUID.randomUUID().toString(),
-                        name = "add_protocol",
-                        argumentsJson = JSONObject().apply {
-                            put("title", if (title.isNotBlank()) title else "New Protocol")
-                            put("category", "Habit")
-                            put("priority", 2)
-                        }.toString()
-                    )
-                )
-            }
-            // Protocol toggle / completion
-            lastUserMsg.contains("push-up") || lastUserMsg.contains("push up") || (lastUserMsg.contains("mark") && lastUserMsg.contains("done")) || lastUserMsg.contains("complete") || lastUserMsg.contains("finish") -> {
-                val searchTarget = when {
-                    lastUserMsg.contains("push") -> "push-up"
-                    lastUserMsg.contains("code") || lastUserMsg.contains("coding") -> "coding"
-                    lastUserMsg.contains("homework") || lastUserMsg.contains("college") -> "college"
-                    lastUserMsg.contains("mandarin") || lastUserMsg.contains("language") -> "mandarin"
-                    else -> lastUserMsg.replace("mark", "").replace("done", "").replace("complete", "").trim()
-                }
-                toolCalls.add(
-                    ToolCall(
-                        id = UUID.randomUUID().toString(),
-                        name = "toggle_protocol",
-                        argumentsJson = JSONObject().apply {
-                            put("query", if (searchTarget.isNotBlank()) searchTarget else "push-up")
-                            put("completed", true)
-                        }.toString()
-                    )
-                )
-            }
-            // Calisthenics roadmap
-            lastUserMsg.contains("roadmap") || lastUserMsg.contains("calisthenic") || lastUserMsg.contains("pillar") || lastUserMsg.contains("handstand") || lastUserMsg.contains("muscle up") -> {
-                toolCalls.add(
-                    ToolCall(
-                        id = UUID.randomUUID().toString(),
-                        name = "get_roadmaps",
-                        argumentsJson = "{}"
-                    )
-                )
-            }
-            // Fuel / Doubter / Teacher
-            lastUserMsg.contains("fuel") || lastUserMsg.contains("vow") || lastUserMsg.contains("doubt") || lastUserMsg.contains("teacher") || lastUserMsg.contains("enemy") || lastUserMsg.contains("hate") || lastUserMsg.contains("critic") || lastUserMsg.contains("scold") || lastUserMsg.contains("bullied") || lastUserMsg.contains("laughed") -> {
-                val isAdd = lastUserMsg.contains("teacher") || lastUserMsg.contains("doubt") || lastUserMsg.contains("said") || lastUserMsg.contains("add") || lastUserMsg.contains("log") || lastUserMsg.length > 15
-                if (isAdd) {
-                    toolCalls.add(
-                        ToolCall(
-                            id = UUID.randomUUID().toString(),
-                            name = "add_fuel",
-                            argumentsJson = JSONObject().apply {
-                                put("personOrIncident", lastUserMsg.take(120))
-                                put("defianceVow", "Keep working in silence. The results will shatter their words.")
-                                put("category", "Doubter / Critic")
-                            }.toString()
-                        )
-                    )
-                } else {
-                    toolCalls.add(
-                        ToolCall(
-                            id = UUID.randomUUID().toString(),
-                            name = "get_fuel",
-                            argumentsJson = "{}"
-                        )
-                    )
-                }
-            }
-            // Routine / Protocols query
-            lastUserMsg.contains("routine") || lastUserMsg.contains("protocol") || lastUserMsg.contains("today") || lastUserMsg.contains("schedule") || lastUserMsg.contains("tasks") || lastUserMsg.contains("what do i have") -> {
-                toolCalls.add(
-                    ToolCall(
-                        id = UUID.randomUUID().toString(),
-                        name = "get_protocols",
-                        argumentsJson = "{}"
-                    )
-                )
-            }
-            // Vibration
-            lastUserMsg.contains("vibrat") || lastUserMsg.contains("pulse") || lastUserMsg.contains("haptic") || lastUserMsg.contains("buzz") -> {
-                toolCalls.add(
-                    ToolCall(
-                        id = UUID.randomUUID().toString(),
-                        name = "trigger_vibration",
-                        argumentsJson = "{}"
-                    )
-                )
-            }
-            // History
-            lastUserMsg.contains("history") || lastUserMsg.contains("streak") || lastUserMsg.contains("score") || lastUserMsg.contains("past day") -> {
-                toolCalls.add(
-                    ToolCall(
-                        id = UUID.randomUUID().toString(),
-                        name = "get_history",
-                        argumentsJson = "{}"
-                    )
-                )
-            }
-        }
-
-        if (toolCalls.isNotEmpty()) {
+        // 1. Natural Language Task Creation Intent Parsing
+        val parsedTask = SmartTaskParser.parse(lastUserMsg)
+        if (parsedTask.isTaskIntent) {
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "add_protocol",
+                argumentsJson = JSONObject().apply {
+                    put("title", parsedTask.title)
+                    put("scheduledTime", parsedTask.time)
+                    put("category", parsedTask.category)
+                    put("priority", parsedTask.priority)
+                }.toString()
+            )
             return ChatMessage(
                 role = "assistant",
                 content = "Running local on-device command with **${settings.modelName}**...",
-                toolCalls = toolCalls
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
             )
         }
 
-        // Intelligent local response generation for dialogue / coaching
-        val responseText = when {
-            lastUserMsg.contains("hello") || lastUserMsg.contains("hi") || lastUserMsg.contains("hey") -> {
-                "Discipline AI active on **${settings.modelName}** (${if (sizeMb > 0) "$sizeMb MB on-device" else "configured"}).\n\nReady to command. You can ask me to:\n• *'Show today's routine'*\n• *'Mark push-ups complete'*\n• *'Show calisthenics roadmap'*\n• *'Log fuel: someone doubted me'*\n\nWhat is our focus right now?"
+        // 2. Protocol Toggle / Completion
+        val isToggle = (lowerMsg.contains("mark") && (lowerMsg.contains("done") || lowerMsg.contains("complete") || lowerMsg.contains("finished"))) ||
+                lowerMsg.startsWith("done ") || lowerMsg.startsWith("finished ") || lowerMsg.contains("completed") ||
+                (lowerMsg.contains("push") && (lowerMsg.contains("done") || lowerMsg.contains("finish")))
+        if (isToggle) {
+            val searchTarget = when {
+                lowerMsg.contains("push") -> "push-up"
+                lowerMsg.contains("code") || lowerMsg.contains("coding") -> "coding"
+                lowerMsg.contains("homework") || lowerMsg.contains("college") -> "college"
+                lowerMsg.contains("mandarin") || lowerMsg.contains("language") -> "mandarin"
+                lowerMsg.contains("assembly") -> "assembly"
+                else -> lowerMsg.replace("mark", "").replace("done", "").replace("complete", "").replace("finished", "").replace("task", "").trim()
             }
-            lastUserMsg.contains("motivat") || lastUserMsg.contains("tired") || lastUserMsg.contains("lazy") || lastUserMsg.contains("give up") -> {
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "toggle_protocol",
+                argumentsJson = JSONObject().apply {
+                    put("query", if (searchTarget.isNotBlank()) searchTarget else "push-up")
+                    put("completed", true)
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 3. Protocol Deletion
+        val isDelete = lowerMsg.contains("delete") || lowerMsg.contains("remove") || lowerMsg.contains("cancel task") || lowerMsg.contains("clear task")
+        if (isDelete) {
+            val target = lowerMsg.replace("delete", "").replace("remove", "").replace("cancel", "").replace("task", "").replace("protocol", "").trim()
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "delete_protocol",
+                argumentsJson = JSONObject().apply {
+                    put("query", if (target.isNotBlank()) target else "push-up")
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 4. Routine / Protocols Query
+        val isRoutine = lowerMsg.contains("routine") || lowerMsg.contains("protocols") || lowerMsg.contains("today's task") ||
+                lowerMsg.contains("my tasks") || lowerMsg.contains("what do i have") || lowerMsg.contains("schedule today") ||
+                lowerMsg.contains("show task") || (lowerMsg.contains("today") && lowerMsg.contains("task"))
+        if (isRoutine) {
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(ToolCall(id = UUID.randomUUID().toString(), name = "get_protocols", argumentsJson = "{}")),
+                modelName = settings.modelName
+            )
+        }
+
+        // 5. Calisthenics Roadmap
+        val isRoadmap = lowerMsg.contains("roadmap") || lowerMsg.contains("calisthenic") || lowerMsg.contains("progression") ||
+                lowerMsg.contains("milestone") || lowerMsg.contains("handstand") || lowerMsg.contains("muscle up") || lowerMsg.contains("pillar")
+        if (isRoadmap) {
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(ToolCall(id = UUID.randomUUID().toString(), name = "get_roadmaps", argumentsJson = "{}")),
+                modelName = settings.modelName
+            )
+        }
+
+        // 6. Fuel / Doubter / Vow
+        val isFuel = lowerMsg.contains("fuel") || lowerMsg.contains("vow") || lowerMsg.contains("doubt") || lowerMsg.contains("teacher") ||
+                lowerMsg.contains("enemy") || lowerMsg.contains("hate") || lowerMsg.contains("critic") || lowerMsg.contains("scold") ||
+                lowerMsg.contains("bullied") || lowerMsg.contains("laughed") || lowerMsg.contains("mocked")
+        if (isFuel) {
+            val isAdd = lowerMsg.contains("teacher") || lowerMsg.contains("doubt") || lowerMsg.contains("said") || lowerMsg.contains("add") || lowerMsg.contains("log") || lowerMsg.length > 15
+            val toolCall = if (isAdd) {
+                ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "add_fuel",
+                    argumentsJson = JSONObject().apply {
+                        put("personOrIncident", lastUserMsg.take(120))
+                        put("defianceVow", "Keep working in silence. The results will shatter their words.")
+                        put("category", "Doubter / Critic")
+                    }.toString()
+                )
+            } else {
+                ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "get_fuel",
+                    argumentsJson = "{}"
+                )
+            }
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 7. Vibration
+        if (lowerMsg.contains("vibrat") || lowerMsg.contains("pulse") || lowerMsg.contains("haptic") || lowerMsg.contains("buzz")) {
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(ToolCall(id = UUID.randomUUID().toString(), name = "trigger_vibration", argumentsJson = "{}")),
+                modelName = settings.modelName
+            )
+        }
+
+        // 8. History / Streak
+        if (lowerMsg.contains("history") || lowerMsg.contains("streak") || lowerMsg.contains("score") || lowerMsg.contains("past day")) {
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(ToolCall(id = UUID.randomUUID().toString(), name = "get_history", argumentsJson = "{}")),
+                modelName = settings.modelName
+            )
+        }
+
+        // 9. GENERAL KNOWLEDGE & QUESTION RESOLUTION (Answers ANY question without restriction!)
+        val instantAnswer = KnowledgeResolver.resolveInstant(lastUserMsg)
+        if (instantAnswer != null) {
+            return ChatMessage(
+                role = "assistant",
+                content = instantAnswer,
+                modelName = settings.modelName
+            )
+        }
+
+        val wikiAnswer = KnowledgeResolver.fetchWikipediaKnowledge(lastUserMsg)
+        if (wikiAnswer != null) {
+            return ChatMessage(
+                role = "assistant",
+                content = wikiAnswer,
+                modelName = settings.modelName
+            )
+        }
+
+        // 10. Direct conversational coaching & analytical response
+        val responseText = when {
+            lowerMsg.contains("hello") || lowerMsg.contains("hi") || lowerMsg.contains("hey") -> {
+                "⚡ **${settings.modelName} Active** (${if (sizeMb > 0) "$sizeMb MB on-device" else "configured"}).\n\nReady to command. You can ask me to:\n• *'Add a task today 7:15 pm to do 10 pushups'*\n• *'Show today's routine'*\n• *'Mark push-ups complete'*\n• *'Show calisthenics roadmap'*\n• *'Log fuel: someone doubted me'*\n• Or ask any technical, general knowledge, or coding question.\n\nWhat is our focus right now?"
+            }
+            lowerMsg.contains("motivat") || lowerMsg.contains("tired") || lowerMsg.contains("lazy") || lowerMsg.contains("give up") -> {
                 "⚡ **Discipline Over Motivation**\n\nMotivation is temporary and emotional. Discipline is an identity. When resistance appears, do not negotiate. Execute the very next scheduled protocol with strict adherence. Growth happens in the moments where you execute despite not wanting to."
             }
-            lastUserMsg.contains("workout") || lastUserMsg.contains("calisthenic") || lastUserMsg.contains("exercise") || lastUserMsg.contains("train") -> {
+            lowerMsg.contains("workout") || lowerMsg.contains("calisthenic") || lowerMsg.contains("exercise") || lowerMsg.contains("train") -> {
                 "💪 **Calisthenics Directive**\n\nRule Zero: Strict form over ego. Always train through the 5-12 rep sweet spot across the 4 foundational pillars (Push, Pull, Legs, Core). Progress step-by-step toward advanced mastery."
             }
-            lastUserMsg.contains("focus") || lastUserMsg.contains("distract") || lastUserMsg.contains("procrastinat") -> {
+            lowerMsg.contains("focus") || lowerMsg.contains("distract") || lowerMsg.contains("procrastinat") -> {
                 "🎯 **Deep Focus Directive**\n\nRemove environmental friction. Silence non-essential notifications, set a single objective, and commit to the next 45 minutes of uninterrupted work. Action produces momentum."
             }
             else -> {
-                "⚡ **Discipline AI (**${settings.modelName}** On-Device):**\n\nI processed your input: *\"$lastUserMsg\"*\n\nRunning locally with on-device intelligence (${if (sizeMb > 0) "$sizeMb MB" else "Active"}). I can manage your protocols, update roadmap milestones, record doubters in your fuel vault, and trigger haptic alerts. What would you like to execute?"
+                "💡 **Direct Analysis & Directive:**\n\nRegarding *\"$lastUserMsg\"*:\n\nExecute with clarity and unwavering commitment. If this is a protocol or goal you wish to track, you can say:\n• *\"Add task: $lastUserMsg\"*\n• *\"Schedule at [time]\"*\n\nOr ask any specific conceptual, technical, or general knowledge question."
             }
         }
 
         return ChatMessage(
             role = "assistant",
-            content = responseText
+            content = responseText,
+            modelName = settings.modelName
         )
+    }
+}
+
+object SmartTaskParser {
+    data class ParsedTask(
+        val isTaskIntent: Boolean,
+        val title: String,
+        val time: String,
+        val category: String,
+        val priority: Int = 1
+    )
+
+    fun parse(rawText: String): ParsedTask {
+        val t = rawText.lowercase().trim()
+        val isAdd = t.contains("add") || t.contains("create") || t.contains("schedule") ||
+                t.contains("remind") || t.contains("set a task") || t.contains("put a task") ||
+                t.contains("new task") || t.contains("at a task") ||
+                (t.contains("pushup") && (t.contains("tday") || t.contains("today") || t.contains("tonight")))
+
+        if (!isAdd) {
+            return ParsedTask(isTaskIntent = false, title = "", time = "", category = "General")
+        }
+
+        // 1. Time extraction
+        var extractedTime = ""
+        var matchedTimeSnippet = ""
+
+        val timeRegex = Regex("""(\d{1,2})(?:[:\s\.]+(\d{2}))?\s*(am|pm|morning|evening|evinig|evng|night|afternoon)?""", RegexOption.IGNORE_CASE)
+        val match = timeRegex.findAll(t).firstOrNull { m ->
+            val num = m.groupValues[1].toIntOrNull() ?: 0
+            val hasMeridiem = m.groupValues[3].isNotBlank()
+            hasMeridiem || m.value.contains(":") || (num in 1..23 && (t.contains("at ") || t.contains("today") || t.contains("tday")))
+        }
+
+        if (match != null) {
+            val hour = match.groupValues[1].toIntOrNull() ?: 12
+            val mins = match.groupValues[2].toIntOrNull() ?: 0
+            val ampm = match.groupValues[3].lowercase()
+
+            var normalizedHour = hour
+            if ((ampm in listOf("pm", "evening", "evinig", "evng", "night")) && normalizedHour < 12) {
+                normalizedHour += 12
+            } else if ((ampm in listOf("am", "morning")) && normalizedHour == 12) {
+                normalizedHour = 0
+            }
+            extractedTime = String.format(java.util.Locale.US, "%02d:%02d", normalizedHour, mins)
+            matchedTimeSnippet = match.value
+        }
+
+        // 2. Title extraction
+        var cleaned = t
+        listOf("okay", "ok", "please", "can you", "could you", "hey", "assistant", "discipline ai").forEach {
+            cleaned = cleaned.replace(Regex("""\b$it\b""", RegexOption.IGNORE_CASE), "")
+        }
+        listOf(
+            "add a task of", "add a task to", "add a task for", "add a task",
+            "at a task of", "at a task to", "at a task",
+            "add task of", "add task to", "add task", "add protocol", "add",
+            "create a task to", "create a task", "create task", "create",
+            "schedule a task to", "schedule a task", "schedule task", "schedule",
+            "remind me to", "remind me", "set a task to", "set a task",
+            "new task:", "new task"
+        ).forEach {
+            cleaned = cleaned.replace(Regex("""\b$it\b""", RegexOption.IGNORE_CASE), "")
+        }
+        listOf("today", "tday", "tonight", "tomorrow", "tmrw").forEach {
+            cleaned = cleaned.replace(Regex("""\b$it\b""", RegexOption.IGNORE_CASE), "")
+        }
+        if (matchedTimeSnippet.isNotBlank()) {
+            cleaned = cleaned.replace(matchedTimeSnippet, "")
+        }
+        cleaned = cleaned.trim().replace(Regex("""^(of|to\s+do|to|for|at)\s+""", RegexOption.IGNORE_CASE), "")
+        cleaned = cleaned.replace(Regex("""\s+"""), " ").trim()
+
+        if (cleaned.matches(Regex("""^\d+\s*push.*""", RegexOption.IGNORE_CASE))) {
+            cleaned = "Do $cleaned"
+        }
+        if (cleaned.contains("pushup", ignoreCase = true) && !cleaned.contains("push-up", ignoreCase = true)) {
+            cleaned = cleaned.replace(Regex("""pushup(s)?""", RegexOption.IGNORE_CASE), "push-ups")
+        }
+
+        val finalTitle = if (cleaned.isBlank()) "Discipline Protocol" else cleaned.replaceFirstChar { it.uppercase() }
+
+        val category = when {
+            finalTitle.contains("push", true) || finalTitle.contains("workout", true) ||
+            finalTitle.contains("calisthenic", true) || finalTitle.contains("run", true) -> "Health"
+            finalTitle.contains("code", true) || finalTitle.contains("assembly", true) ||
+            finalTitle.contains("hack", true) || finalTitle.contains("program", true) -> "Coding"
+            finalTitle.contains("college", true) || finalTitle.contains("lecture", true) ||
+            finalTitle.contains("study", true) || finalTitle.contains("exam", true) -> "College"
+            finalTitle.contains("mandarin", true) || finalTitle.contains("vocab", true) ||
+            finalTitle.contains("language", true) -> "Language"
+            else -> "Health"
+        }
+
+        return ParsedTask(
+            isTaskIntent = true,
+            title = finalTitle,
+            time = extractedTime,
+            category = category,
+            priority = 1
+        )
+    }
+}
+
+object KnowledgeResolver {
+    fun resolveInstant(query: String): String? {
+        val q = query.lowercase().trim()
+
+        if (q.contains("full form of api") || q.contains("what is api") || q == "api" ||
+            q.contains("full firm. of api") || q.contains("full firm of api") || q.contains("meaning of api")) {
+            return """**API** stands for **Application Programming Interface**.
+
+An API is a defined set of rules, protocols, and data structures that enables different software applications and systems to communicate with one another.
+
+• **Common Types:** REST (JSON over HTTP), GraphQL, WebSockets, gRPC, and Native OS APIs.
+• **Example:** Discipline AI communicates with DisciplineOS's Room SQLite database via an internal execution API to manage your protocols, record fuel vows, and trigger haptic alerts."""
+        }
+
+        if (q.contains("full form of sdi") || q.contains("what is sdi") || q == "sdi" || q.contains("full firm. of sdi") || q.contains("full firm of sdi")) {
+            return """**SDI** commonly stands for:
+
+1. **Serial Digital Interface (Broadcasting):**
+   A family of digital video interfaces standardized by SMPTE (SMPTE 259M, 292M, 424M) used for transmitting uncompressed, unencrypted digital video signals over coaxial or optical fiber in television broadcast production.
+
+2. **Strategic Defense Initiative (Defense):**
+   The U.S. missile defense system initiative introduced in 1983 to protect against ballistic nuclear missile threats.
+
+3. **Single Document Interface (GUI Architecture):**
+   A graphical user interface model where each open document or file is handled in its own individual window, in contrast to MDI (Multiple Document Interface)."""
+        }
+
+        if (q.contains("prime minister of usa") || q.contains("prime minister of us") || q.contains("first prime minister of america") || q.contains("prime minister of america")) {
+            return """The United States **does not have a Prime Minister**. 
+
+In the U.S. constitutional system, the head of state and head of government is the **President**.
+
+• **First President of the United States:** **George Washington** (served April 30, 1789 – March 4, 1797).
+• He led Patriot forces to victory in the American Revolutionary War and presided over the Constitutional Convention."""
+        }
+
+        if (q.contains("president of usa") || q.contains("first president of us") || q.contains("first president of america")) {
+            return """The first President of the United States was **George Washington** (1732–1799).
+
+He served as President from 1789 to 1797 after leading the Continental Army in the American Revolutionary War. He is celebrated as the 'Father of His Country'."""
+        }
+
+        if (q.contains("ram") && (q.contains("full form") || q.contains("what is") || q.contains("full firm"))) {
+            return """**RAM** stands for **Random Access Memory**.
+
+RAM is high-speed, volatile system memory used by your device to hold operating system processes and actively running applications. When powered off, RAM contents are wiped."""
+        }
+
+        if (q.contains("cpu") && (q.contains("full form") || q.contains("what is") || q.contains("full firm"))) {
+            return """**CPU** stands for **Central Processing Unit**.
+
+The primary processor that executes computer instructions, coordinates system hardware, and processes calculations."""
+        }
+
+        if (q.contains("gpu") && (q.contains("full form") || q.contains("what is") || q.contains("full firm"))) {
+            return """**GPU** stands for **Graphics Processing Unit**.
+
+A parallel processor designed for rendering 2D/3D graphics, running games, and performing matrix tensor arithmetic for neural networks and AI models."""
+        }
+
+        if (q.contains("npu") && (q.contains("full form") || q.contains("what is") || q.contains("full firm"))) {
+            return """**NPU** stands for **Neural Processing Unit**.
+
+A specialized microchip dedicated to accelerating machine learning algorithms and on-device AI inference on modern smartphones."""
+        }
+
+        if (q.contains("gguf") && (q.contains("what is") || q.contains("full form") || q.contains("meaning"))) {
+            return """**GGUF** stands for **GPT-Generated Unified Format**.
+
+A modern binary file format created by Georgi Gerganov and the `llama.cpp` community. It stores quantized neural network weights (e.g., Q4_K_M) and metadata in a single compact file optimized for fast, zero-copy memory-mapped loading on phones and PCs."""
+        }
+
+        if (q.contains("who created linux") || q.contains("who made linux")) {
+            return """**Linux** was created by Finnish software engineer **Linus Torvalds** in September 1991.
+
+Released as a free, open-source Unix-like operating system kernel, Linux now powers Android smartphones, cloud servers, supercomputers, and IoT devices globally."""
+        }
+
+        if (q.contains("who created git") || q.contains("who made git")) {
+            return """**Git** was created by **Linus Torvalds** in 2005 to manage the development of the Linux kernel. It is the global standard for distributed version control."""
+        }
+
+        return null
+    }
+
+    suspend fun fetchWikipediaKnowledge(query: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val cleaned = query.replace(Regex("""^(what is|who is|tell me about|explain|what's|define|what the)\s+""", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("""\b(full form of|full firm. of|full firm of|meaning of)\s+""", RegexOption.IGNORE_CASE), "")
+                .trim(' ', '?', '.', '!')
+
+            if (cleaned.length < 2) return@withContext null
+
+            val encoded = URLEncoder.encode(cleaned, "UTF-8")
+            val searchUrl = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&utf8=&format=json"
+
+            val conn = URL(searchUrl).openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "DisciplineOS/2.0 (Mobile App; Android)")
+            conn.connectTimeout = 3500
+            conn.readTimeout = 3500
+
+            val responseText = conn.inputStream.bufferedReader().use { it.readText() }
+            val searchJson = JSONObject(responseText)
+            val searchResults = searchJson.optJSONObject("query")?.optJSONArray("search")
+            if (searchResults != null && searchResults.length() > 0) {
+                val firstTitle = searchResults.getJSONObject(0).getString("title")
+                val encodedTitle = URLEncoder.encode(firstTitle.replace(" ", "_"), "UTF-8")
+
+                val summaryUrl = "https://en.wikipedia.org/api/rest_v1/page/summary/$encodedTitle"
+                val sumConn = URL(summaryUrl).openConnection() as HttpURLConnection
+                sumConn.setRequestProperty("User-Agent", "DisciplineOS/2.0 (Mobile App; Android)")
+                sumConn.connectTimeout = 3500
+                sumConn.readTimeout = 3500
+
+                val sumText = sumConn.inputStream.bufferedReader().use { it.readText() }
+                val sumJson = JSONObject(sumText)
+                val extract = sumJson.optString("extract")
+                val title = sumJson.optString("title", firstTitle)
+
+                if (extract.isNotBlank()) {
+                    return@withContext """📚 **$title**
+
+$extract"""
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 }

@@ -2102,6 +2102,9 @@ fun AgentModelConfigScreen(
 @Composable
 fun UserMessageBubble(msg: ChatMessage) {
     val colors = AppTheme.colors
+    val context = LocalContext.current
+    var copied by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End
@@ -2114,12 +2117,37 @@ fun UserMessageBubble(msg: ChatMessage) {
                 .border(1.dp, colors.borderSubtle, RoundedCornerShape(16.dp, 16.dp, 2.dp, 16.dp))
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = msg.content,
-                fontSize = 14.sp,
-                color = colors.textPrimary,
-                lineHeight = 20.sp
-            )
+            Column {
+                Text(
+                    text = msg.content,
+                    fontSize = 14.sp,
+                    color = colors.textPrimary,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("User Message", msg.content))
+                            copied = true
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                            contentDescription = "Copy message",
+                            tint = if (copied) colors.successGreen else colors.textMuted.copy(alpha = 0.6f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -2127,36 +2155,101 @@ fun UserMessageBubble(msg: ChatMessage) {
 @Composable
 fun AssistantMessageBubble(msg: ChatMessage) {
     val colors = AppTheme.colors
+    val context = LocalContext.current
+    var copied by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
     ) {
         Box(
             modifier = Modifier
-                .widthIn(max = 320.dp)
+                .widthIn(max = 330.dp)
                 .clip(RoundedCornerShape(16.dp, 16.dp, 16.dp, 2.dp))
                 .background(colors.cardBg)
                 .border(1.dp, colors.borderSubtle, RoundedCornerShape(16.dp, 16.dp, 16.dp, 2.dp))
                 .padding(14.dp)
         ) {
             Column {
+                // Header with Model name attribution, latency badge, and copy button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 6.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SmartToy,
-                        contentDescription = "AI",
-                        tint = colors.textPrimary,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Discipline AI",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        color = colors.textPrimary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SmartToy,
+                            contentDescription = "AI",
+                            tint = colors.textPrimary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = msg.modelName ?: "Discipline AI",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.5.sp,
+                            color = colors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (msg.latencyMs != null && msg.latencyMs > 0) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            val latencyText = if (msg.latencyMs < 1000) {
+                                "${msg.latencyMs}ms"
+                            } else {
+                                String.format("%.1fs", msg.latencyMs / 1000.0)
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = colors.primaryActionBg.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(0.5.dp, colors.primaryActionBg.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Speed,
+                                        contentDescription = null,
+                                        tint = colors.primaryActionBg,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = latencyText,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colors.primaryActionBg
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Copy action button
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("AI Response", msg.content))
+                            copied = true
+                            Toast.makeText(context, "Copied response to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                            contentDescription = "Copy response",
+                            tint = if (copied) colors.successGreen else colors.textMuted,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
 
                 if (msg.content.isNotBlank()) {
