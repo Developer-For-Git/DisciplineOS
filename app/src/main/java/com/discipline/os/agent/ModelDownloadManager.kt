@@ -47,46 +47,69 @@ object ModelDownloadManager {
         return File(getModelsDir(context), fileName)
     }
 
-    /**
-     * Checks if a model file is present in either app storage or public downloads
-     */
-    fun findExistingModelFile(context: Context, modelIdentifier: String): File? {
-        val cleanId = modelIdentifier.lowercase().replace(" ", "-").replace(":", "-")
-        
+    fun getAllDownloadedModelFiles(context: Context): List<File> {
+        val results = mutableListOf<File>()
+
         // 1. App external models folder
         val dir1 = getModelsDir(context)
-        val f1 = dir1.listFiles()?.firstOrNull { 
-            (it.name.contains(cleanId, ignoreCase = true) || cleanId.contains(it.nameWithoutExtension, ignoreCase = true)) && it.length() > 50_000_000L 
-        }
-        if (f1 != null) return f1
+        dir1.listFiles()?.filter { (it.name.endsWith(".gguf", ignoreCase = true) || it.length() > 50_000_000L) && it.length() > 10_000L }?.let { results.addAll(it) }
 
-        // 2. Public Downloads / DisciplineOS / models (DownloadManager target)
+        // 2. Public Downloads / DisciplineOS / models
         val publicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DisciplineOS/models")
         if (publicDir.exists()) {
-            val f2 = publicDir.listFiles()?.firstOrNull {
-                (it.name.contains(cleanId, ignoreCase = true) || cleanId.contains(it.nameWithoutExtension, ignoreCase = true)) && it.length() > 50_000_000L
-            }
-            if (f2 != null) return f2
+            publicDir.listFiles()?.filter { (it.name.endsWith(".gguf", ignoreCase = true) || it.length() > 50_000_000L) && it.length() > 10_000L }?.let { results.addAll(it) }
         }
 
         // 3. Root Downloads folder
         val rootDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         if (rootDownloads.exists()) {
-            val f3 = rootDownloads.listFiles()?.firstOrNull {
-                it.name.endsWith(".gguf", ignoreCase = true) && 
-                (it.name.contains(cleanId, ignoreCase = true) || cleanId.contains(it.nameWithoutExtension, ignoreCase = true)) && 
-                it.length() > 50_000_000L
-            }
-            if (f3 != null) return f3
+            rootDownloads.listFiles()?.filter { it.name.endsWith(".gguf", ignoreCase = true) && it.length() > 10_000L }?.let { results.addAll(it) }
         }
 
-        // 4. Internal filesDir
+        // 4. Internal filesDir / models
         val dirInternal = File(context.filesDir, "models")
         if (dirInternal.exists()) {
-            val f4 = dirInternal.listFiles()?.firstOrNull {
-                (it.name.contains(cleanId, ignoreCase = true) || cleanId.contains(it.nameWithoutExtension, ignoreCase = true)) && it.length() > 50_000_000L
+            dirInternal.listFiles()?.filter { (it.name.endsWith(".gguf", ignoreCase = true) || it.length() > 50_000_000L) && it.length() > 10_000L }?.let { results.addAll(it) }
+        }
+
+        return results.distinctBy { it.absolutePath }
+    }
+
+    /**
+     * Checks if a model file is present in either app storage or public downloads
+     */
+    fun findExistingModelFile(context: Context, modelIdentifier: String): File? {
+        if (modelIdentifier.isBlank()) return null
+
+        // 1. Direct path check
+        val directFile = File(modelIdentifier)
+        if (directFile.exists() && directFile.isFile && directFile.length() > 10_000L) {
+            return directFile
+        }
+
+        val allFiles = getAllDownloadedModelFiles(context)
+        if (allFiles.isEmpty()) return null
+
+        val cleanId = modelIdentifier.lowercase().replace(" ", "").replace("-", "").replace("_", "").replace(".", "")
+
+        // 2. Exact or substring match on cleaned names
+        val match = allFiles.firstOrNull { file ->
+            val cleanFileName = file.name.lowercase().replace(" ", "").replace("-", "").replace("_", "").replace(".", "")
+            cleanFileName.contains(cleanId) || cleanId.contains(cleanFileName.substringBefore("gguf"))
+        }
+        if (match != null) return match
+
+        // 3. Key token matching (e.g. "llama" and "1b", "gemma" and "2b")
+        val tokens = modelIdentifier.lowercase()
+            .split(" ", "-", "_", ".")
+            .filter { it.length > 1 && it !in listOf("instruct", "gguf", "model", "tiny", "google", "meta", "microsoft") }
+
+        if (tokens.isNotEmpty()) {
+            val tokenMatch = allFiles.firstOrNull { file ->
+                val fName = file.name.lowercase()
+                tokens.all { t -> fName.contains(t) }
             }
-            if (f4 != null) return f4
+            if (tokenMatch != null) return tokenMatch
         }
 
         return null

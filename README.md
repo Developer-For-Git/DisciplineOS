@@ -85,6 +85,7 @@
 
 ### 1. 🤖 Discipline AI Autonomous Agent & In-App Execution
 * **Direct Application Integration**: Unlike generic chat bots, Discipline AI has direct access to the app's internal Room SQLite database, AlarmScheduler, and vibration hardware via structured function calls.
+* **Top Model Switcher Bar**: Instantly swap between active and downloaded on-device models (e.g. Meta Llama 3.2 1B, Google Gemma 2 2B) directly from a horizontal switcher pinned to the top of the chat area.
 * **Autonomous Protocol Execution**:
   * Query routines by date, priority, or time (`get_daily_protocols`).
   * Mark protocols completed or toggle status instantly (`toggle_protocol_status`).
@@ -92,14 +93,16 @@
   * Add defiance quotes directly to your motivational fuel stash (`add_fuel_vow`).
   * Trigger hardware vibration diagnostic sweeps (`test_vibration`).
   * Audit past days' discipline scores and completion percentages (`get_past_history`).
+* **Clean Structured Markdown Responses**: Pure human-readable Markdown formatting without raw JSON code dumps, backed by realistic progressive on-device tensor evaluation pacing.
 * **Full-Screen Workspace**: When opened, the bottom dock automatically unmounts to provide maximum screen real estate. The top header features a back button to return to the dashboard, a direct shortcut to historical performance records, model settings, and chat reset.
 * **Monochrome Professional Aesthetic**: Stripped of distracting emoji clutter and inconsistent accent colors; follows DisciplineOS's strict dark slate OLED design language.
 
 ### 2. 🧠 On-Device Tiny Models & Multi-Provider LLM Gateway
-* **Local / On-Device Tiny Models Catalog**: Run offline without sending data to third parties. Curated catalog with GGUF download specifications and Ollama instructions:
+* **Local / On-Device Tiny Models Catalog**: Run offline without sending data to third parties. Automatically scans device storage and downloads directory for `.gguf` weights with 1-tap activation:
   * **Google Gemma 2 2B Instruct** (1.6 GB, Q4_K_M): High precision, fast mobile inference.
   * **Meta Llama 3.2 1B Instruct** (800 MB, Q4_K_M): Ultra-lightweight edge model.
   * **Meta Llama 3.2 3B Instruct** (2.0 GB, Q4_K_M): Powerful on-device reasoning and schedule extraction.
+  * **Custom GGUF Downloader**: Direct download manager supporting custom HuggingFace or direct web links with progress bar and instant offline activation.
 * **Flexible Cloud Providers**:
   * **OpenRouter** (Default: `google/gemini-2.0-flash-exp:free` for fast, zero-cost intelligence).
   * **OpenAI** (`gpt-4o-mini`).

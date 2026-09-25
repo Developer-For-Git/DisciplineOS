@@ -92,16 +92,6 @@ fun AgentScreen(
         }
     }
 
-    val quickActions = remember {
-        listOf(
-            "Today's routine",
-            "Mark push-ups complete",
-            "Reschedule bedtime to 23:00",
-            "Add fuel entry",
-            "Test vibration",
-            "Discipline history"
-        )
-    }
 
     Column(
         modifier = modifier
@@ -248,32 +238,99 @@ fun AgentScreen(
             )
         }
 
-        // Quick Prompt Chips
+        // Top Model Switcher Bar (Quick switching between on-device & cloud models)
+        val downloadedModelFiles = remember(downloadStatus, isConfiguringModel, currentSettings) {
+            ModelDownloadManager.getAllDownloadedModelFiles(context)
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            quickActions.forEach { action ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.cardBg)
-                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(16.dp))
-                        .clickable {
-                            coroutineScope.launch {
-                                engine.sendMessage(action)
+            if (downloadedModelFiles.isNotEmpty()) {
+                downloadedModelFiles.forEach { file ->
+                    val cleanFileName = file.nameWithoutExtension
+                    val displayName = when {
+                        cleanFileName.contains("gemma", ignoreCase = true) -> "Google Gemma 2 2B"
+                        cleanFileName.contains("llama", ignoreCase = true) && cleanFileName.contains("1b", ignoreCase = true) -> "Meta Llama 3.2 1B"
+                        cleanFileName.contains("llama", ignoreCase = true) && cleanFileName.contains("3b", ignoreCase = true) -> "Meta Llama 3.2 3B"
+                        cleanFileName.contains("qwen", ignoreCase = true) -> "Qwen 2.5 3B"
+                        cleanFileName.contains("phi", ignoreCase = true) -> "Phi-3.5 Mini"
+                        else -> cleanFileName.take(18)
+                    }
+
+                    val isThisActive = currentSettings.provider == AiProvider.TINY_LOCAL &&
+                            (currentSettings.customBaseUrl == file.absolutePath || currentSettings.modelName.contains(cleanFileName.take(8), ignoreCase = true) || currentSettings.modelName.contains(displayName.take(8), ignoreCase = true))
+
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isThisActive) colors.primaryActionBg else colors.cardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isThisActive) colors.primaryActionBg else colors.borderSubtle),
+                        modifier = Modifier.clickable {
+                            if (!isThisActive) {
+                                val updated = currentSettings.copy(
+                                    provider = AiProvider.TINY_LOCAL,
+                                    modelName = displayName,
+                                    customBaseUrl = file.absolutePath
+                                )
+                                AiSettings.save(context, updated)
+                                currentSettings = updated
+                                Toast.makeText(context, "Active: $displayName", Toast.LENGTH_SHORT).show()
                             }
                         }
-                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isThisActive) Icons.Default.Bolt else Icons.Default.SmartToy,
+                                contentDescription = null,
+                                tint = if (isThisActive) colors.primaryActionFg else colors.textSecondary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = if (isThisActive) "$displayName • Active" else displayName,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isThisActive) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isThisActive) colors.primaryActionFg else colors.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Cloud API / Settings shortcut pill
+            Surface(
+                shape = CircleShape,
+                color = if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) colors.primaryActionBg else colors.cardBg,
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) colors.primaryActionBg else colors.borderSubtle),
+                modifier = Modifier.clickable {
+                    engine.resetStatus()
+                    isConfiguringModel = true
+                }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        imageVector = if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) Icons.Default.CloudQueue else Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) colors.primaryActionFg else colors.textSecondary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
-                        text = action,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.textSecondary
+                        text = if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) "${currentSettings.provider.displayName} • Active" else "Switch / Add Model",
+                        fontSize = 11.5.sp,
+                        fontWeight = if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) FontWeight.Bold else FontWeight.Medium,
+                        color = if (currentSettings.provider != AiProvider.TINY_LOCAL && currentSettings.isConfigured()) colors.primaryActionFg else colors.textSecondary
                     )
                 }
             }
@@ -1540,6 +1597,118 @@ fun AgentModelConfigScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // DOWNLOADED ON-DEVICE MODELS SECTION
+                    val downloadedFiles = remember(downloadStatus) {
+                        ModelDownloadManager.getAllDownloadedModelFiles(context)
+                    }
+
+                    if (downloadedFiles.isNotEmpty()) {
+                        Text(
+                            text = "DOWNLOADED MODELS ON THIS DEVICE (${downloadedFiles.size})",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textMuted
+                        )
+                        Text(
+                            text = "Locally stored GGUF model files ready for offline execution without internet.",
+                            fontSize = 11.5.sp,
+                            color = colors.textSecondary,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+
+                        downloadedFiles.forEach { file ->
+                            val sizeMb = file.length() / (1024 * 1024)
+                            val isThisActive = currentSettings.provider == AiProvider.TINY_LOCAL &&
+                                    (currentSettings.customBaseUrl == file.absolutePath || currentSettings.modelName.contains(file.nameWithoutExtension.take(8), ignoreCase = true))
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(colors.cardElevated)
+                                    .border(
+                                        1.dp,
+                                        if (isThisActive) colors.primaryActionBg else colors.borderSubtle,
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                        Text(
+                                            text = file.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.5.sp,
+                                            color = colors.textPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "$sizeMb MB • Ready on device",
+                                            fontSize = 11.sp,
+                                            color = colors.textSecondary
+                                        )
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        if (isThisActive) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(colors.primaryActionBg)
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "ACTIVE",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = colors.primaryActionFg
+                                                )
+                                            }
+                                        } else {
+                                            Button(
+                                                onClick = {
+                                                    val cleanName = when {
+                                                        file.name.contains("gemma", ignoreCase = true) -> "Google Gemma 2 2B Instruct"
+                                                        file.name.contains("llama", ignoreCase = true) && file.name.contains("1b", ignoreCase = true) -> "Meta Llama 3.2 1B Instruct"
+                                                        file.name.contains("llama", ignoreCase = true) && file.name.contains("3b", ignoreCase = true) -> "Meta Llama 3.2 3B Instruct"
+                                                        else -> file.nameWithoutExtension
+                                                    }
+                                                    val updated = currentSettings.copy(
+                                                        provider = AiProvider.TINY_LOCAL,
+                                                        modelName = cleanName,
+                                                        customBaseUrl = file.absolutePath
+                                                    )
+                                                    onSave(updated)
+                                                    Toast.makeText(context, "Activated $cleanName", Toast.LENGTH_SHORT).show()
+                                                    onBack()
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = colors.primaryActionBg),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Text("Activate", fontSize = 11.5.sp, color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+
                     // 3. CURATED ON-DEVICE MODELS CATALOG
                     Text(
                         text = "CURATED ON-DEVICE MODELS",
@@ -1556,9 +1725,11 @@ fun AgentModelConfigScreen(
                     )
 
                     TinyModelCatalog.models.forEach { model ->
-                        val isDownloaded = ModelDownloadManager.isModelDownloaded(context, model.name)
+                        val isDownloaded = ModelDownloadManager.isModelDownloaded(context, model.name) || ModelDownloadManager.isModelDownloaded(context, model.id)
+                        val existingFile = ModelDownloadManager.findExistingModelFile(context, model.name) ?: ModelDownloadManager.findExistingModelFile(context, model.id)
                         val isDownloadingThis = (downloadStatus as? DownloadStatus.Downloading)?.modelName == model.name
-                        val isCurrentActive = currentSettings.provider == AiProvider.TINY_LOCAL && currentSettings.modelName.contains(model.name, ignoreCase = true)
+                        val isCurrentActive = currentSettings.provider == AiProvider.TINY_LOCAL &&
+                                (currentSettings.modelName.contains(model.name, ignoreCase = true) || (existingFile != null && currentSettings.customBaseUrl == existingFile.absolutePath))
 
                         Box(
                             modifier = Modifier
@@ -1660,6 +1831,7 @@ fun AgentModelConfigScreen(
                                         Button(
                                             onClick = {
                                                 val f = ModelDownloadManager.findExistingModelFile(context, model.name)
+                                                    ?: ModelDownloadManager.findExistingModelFile(context, model.id)
                                                 val updated = currentSettings.copy(
                                                     provider = AiProvider.TINY_LOCAL,
                                                     modelName = model.name,
@@ -1675,7 +1847,7 @@ fun AgentModelConfigScreen(
                                         ) {
                                             Icon(Icons.Default.Check, contentDescription = null, tint = colors.primaryActionFg, modifier = Modifier.size(15.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Activate Model", fontSize = 12.sp, color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
+                                            Text(if (isCurrentActive) "Active Model" else "Activate Model", fontSize = 12.sp, color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
                                         }
                                     } else {
                                         Button(

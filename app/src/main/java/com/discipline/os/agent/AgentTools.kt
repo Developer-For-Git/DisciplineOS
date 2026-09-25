@@ -487,9 +487,14 @@ object AgentTools {
                 }
 
                 "add_fuel" -> {
-                    val person = args.getString("personOrIncident")
-                    val vow = args.getString("defianceVow")
-                    val category = args.optString("category", "Doubter")
+                    val person = (args.optString("personOrIncident").takeIf { it.isNotBlank() }
+                        ?: args.optString("description").takeIf { it.isNotBlank() }
+                        ?: args.optString("incident").takeIf { it.isNotBlank() }
+                        ?: "Doubter / Critic").trim()
+                    val vow = (args.optString("defianceVow").takeIf { it.isNotBlank() }
+                        ?: args.optString("vow").takeIf { it.isNotBlank() }
+                        ?: "Transmute doubts into fuel. Let results shatter all doubts.").trim()
+                    val category = args.optString("category", "Doubter").trim()
                     val entry = FuelEntry(
                         personOrIncident = person,
                         defianceVow = vow,
@@ -503,6 +508,7 @@ object AgentTools {
                         outputJson = JSONObject().apply {
                             put("success", true)
                             put("id", id)
+                            put("personOrIncident", person)
                             put("vow", vow)
                         }.toString()
                     )
