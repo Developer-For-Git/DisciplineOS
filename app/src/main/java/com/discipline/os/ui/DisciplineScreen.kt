@@ -57,7 +57,8 @@ fun DisciplineScreen(
     onUpdateTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onAddTask: (String, String, String, Int, String, Boolean) -> Unit,
-    onShowHistory: () -> Unit = {}
+    onShowHistory: () -> Unit = {},
+    onOpenAi: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
@@ -174,6 +175,24 @@ fun DisciplineScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Discipline AI Launcher Button
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(CardWhite)
+                            .border(1.5.dp, BorderSubtle, CircleShape)
+                            .clickable { onOpenAi() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "Discipline AI",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     // Theme Mode Toggle (Sun for dark, Moon for light)
                     Box(
                         modifier = Modifier

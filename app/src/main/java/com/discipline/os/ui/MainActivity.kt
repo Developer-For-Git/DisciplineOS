@@ -263,6 +263,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onShowHistory = {
                                     showHistoryDialog = true
+                                },
+                                onOpenAi = {
+                                    selectedTab = 2
                                 }
                             )
                             1 -> VideoScreen(
@@ -302,7 +305,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                             2 -> AgentScreen(
-                                engine = agentEngine
+                                engine = agentEngine,
+                                onBack = { selectedTab = 0 },
+                                onShowHistory = { showHistoryDialog = true }
                             )
                             3 -> FuelScreen(
                                 fuelList = fuelList,
@@ -373,7 +378,7 @@ class MainActivity : ComponentActivity() {
 
                     // Floating Capsule Dock (Apple / TripGlide Style with 5 First-Class Tabs)
                     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-                    if (imeBottom == 0.dp) {
+                    if (imeBottom == 0.dp && selectedTab != 2) {
                         FloatingBottomDock(
                             selectedTab = selectedTab,
                             onTabSelected = { selectedTab = it },
@@ -417,7 +422,7 @@ class MainActivity : ComponentActivity() {
 
 /**
  * Floating Stadium Capsule Navigation Dock
- * 5 Tabs: Protocols (0), Vault (1), Copilot AI (2), Fuel (3), System/Control (4)
+ * 5 Tabs: Protocols (0), Vault (1), Discipline AI (2), Fuel (3), System/Control (4)
  */
 @Composable
 fun FloatingBottomDock(
@@ -458,12 +463,12 @@ fun FloatingBottomDock(
                 onClick = { onTabSelected(1) }
             )
 
-            // Tab 2: Copilot AI (Autonomous Agent)
+            // Tab 2: Discipline AI (Autonomous Agent)
             DockItem(
                 isSelected = selectedTab == 2,
                 icon = Icons.Outlined.AutoAwesome,
                 selectedIcon = Icons.Filled.AutoAwesome,
-                contentDescription = "Copilot",
+                contentDescription = "Discipline AI",
                 onClick = { onTabSelected(2) }
             )
 

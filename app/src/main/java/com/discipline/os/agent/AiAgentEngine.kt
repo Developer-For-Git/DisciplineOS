@@ -57,7 +57,7 @@ class AiAgentEngine(
             _messages.value = listOf(
                 ChatMessage(
                     role = "assistant",
-                    content = "🔥 **Discipline Copilot Active.**\n\nI have direct agentic access inside DisciplineOS. I can manage your daily protocols, toggle completion with rapid vibration, adjust scheduled times, record doubter fuel, check past streaks, and keep you relentless.\n\nTry tapping a suggestion below or command me directly."
+                    content = "**Discipline AI Initialized.**\n\nDirect application integration active. Ready to manage routine protocols, update schedules, toggle completion, record fuel vows, and review historical scores.\n\nSelect a prompt below or type an instruction."
                 )
             )
         }
@@ -135,7 +135,7 @@ class AiAgentEngine(
             _status.value = AgentStatus.Error(errorMsg)
             _messages.value = _messages.value + ChatMessage(
                 role = "assistant",
-                content = "⚠️ **Execution Error:** $errorMsg\n\n*Check Copilot Settings (gear icon in header) to verify your API Key, Provider, or Model selection.*"
+                content = "**Execution Error:** $errorMsg\n\n*Check AI Settings (gear icon in header) to verify your API Key, Provider, or Model configuration.*"
             )
         }
     }
@@ -163,7 +163,7 @@ class AiAgentEngine(
                     conn.setRequestProperty("Authorization", "Bearer ${settings.apiKey.trim()}")
                 }
                 conn.setRequestProperty("HTTP-Referer", "https://discipline.os")
-                conn.setRequestProperty("X-Title", "DisciplineOS Copilot")
+                conn.setRequestProperty("X-Title", "DisciplineOS AI")
             }
             else -> {
                 if (settings.apiKey.isNotBlank()) {

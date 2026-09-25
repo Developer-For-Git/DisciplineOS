@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -46,6 +48,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun AgentScreen(
     engine: AiAgentEngine,
+    onBack: () -> Unit,
+    onShowHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -62,6 +66,11 @@ fun AgentScreen(
 
     val listState = rememberLazyListState()
 
+    // Handle system back gesture
+    BackHandler {
+        onBack()
+    }
+
     // Auto-scroll to latest message
     LaunchedEffect(messages.size, status) {
         if (messages.isNotEmpty()) {
@@ -71,18 +80,14 @@ fun AgentScreen(
 
     val quickActions = remember {
         listOf(
-            "📋 What's on my routine today?",
-            "✅ Mark push-ups done",
-            "⏰ Move bedtime to 23:00",
-            "⚡ Test rapid vibration",
-            "🔥 Add doubter fuel vow",
-            "📊 Show discipline history"
+            "Today's routine",
+            "Mark push-ups complete",
+            "Reschedule bedtime to 23:00",
+            "Add fuel entry",
+            "Test vibration",
+            "Discipline history"
         )
     }
-
-    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    val isImeVisible = imeBottom > 0.dp
-    val bottomSpacing = if (isImeVisible) 10.dp else 94.dp
 
     Column(
         modifier = modifier
@@ -90,32 +95,56 @@ fun AgentScreen(
             .background(colors.canvasBg)
             .imePadding()
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = bottomSpacing)
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 12.dp)
     ) {
-            // Header Row
+        // Top Header Row: Back button, Title, History, Settings, Clear
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 14.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                // Back Button
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(colors.cardBg)
+                        .border(1.dp, colors.borderSubtle, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "DISCIPLINE COPILOT",
+                            text = "DISCIPLINE AI",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Black,
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             color = colors.textPrimary,
                             letterSpacing = 1.sp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
-                                .background(colors.accentCyan)
+                                .background(colors.textPrimary.copy(alpha = 0.7f))
                         )
                     }
 
@@ -129,224 +158,246 @@ fun AgentScreen(
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { engine.clearChat() },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(colors.cardBg)
-                            .border(1.dp, colors.borderSubtle, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.DeleteOutline,
-                            contentDescription = "Clear Chat",
-                            tint = colors.textSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = { showSettingsDialog = true },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(colors.cardBg)
-                            .border(1.dp, colors.borderSubtle, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "AI Settings",
-                            tint = colors.accentCyan,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
             }
 
-            // Quick Prompt Chips
+            // Top Actions: History, Settings, Clear
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                quickActions.forEach { action ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(colors.cardBg)
-                            .border(1.dp, colors.borderSubtle, RoundedCornerShape(16.dp))
-                            .clickable {
-                                coroutineScope.launch {
-                                    engine.sendMessage(action)
-                                }
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = action,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
-            }
-
-            // Chat Messages List
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
-            ) {
-                items(messages, key = { it.id }) { msg ->
-                    when (msg.role) {
-                        "user" -> UserMessageBubble(msg)
-                        "assistant" -> AssistantMessageBubble(msg)
-                        "tool" -> ToolResultBubble(msg)
-                    }
-                }
-
-                // Status indicator when processing
-                item {
-                    when (val s = status) {
-                        is AgentStatus.Thinking -> {
-                            StatusCard(
-                                icon = Icons.Outlined.AutoAwesome,
-                                text = s.step,
-                                color = colors.accentCyan
-                            )
-                        }
-                        is AgentStatus.ExecutingTool -> {
-                            StatusCard(
-                                icon = Icons.Outlined.Build,
-                                text = "Executing action: ${s.toolName}...",
-                                color = colors.accentFlame
-                            )
-                        }
-                        is AgentStatus.Error -> {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(colors.accentFlameSoft)
-                                    .border(1.dp, colors.accentFlame.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = "Error",
-                                        tint = colors.accentFlame,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Agent Error",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = colors.accentFlame
-                                    )
-                                }
-                                Text(
-                                    text = s.message,
-                                    fontSize = 12.sp,
-                                    color = colors.textPrimary,
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
-                                )
-                                Button(
-                                    onClick = {
-                                        engine.resetStatus()
-                                        showSettingsDialog = true
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentFlame),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                                ) {
-                                    Text("Configure API / Models", fontSize = 12.sp, color = Color.White)
-                                }
-                            }
-                        }
-                        AgentStatus.Idle -> {}
-                    }
-                }
-            }
-
-            // Bottom Input Row (Directly below LazyColumn inside the Column!)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(colors.cardElevated)
-                    .border(1.dp, colors.borderSubtle, RoundedCornerShape(28.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    placeholder = {
-                        Text(
-                            "Command Copilot (e.g. 'Add 1h coding at 8pm')...",
-                            fontSize = 13.sp,
-                            color = colors.textMuted
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedTextColor = colors.textPrimary,
-                        unfocusedTextColor = colors.textPrimary
-                    ),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = {
-                        if (inputText.isNotBlank() && status == AgentStatus.Idle) {
-                            val textToSend = inputText
-                            inputText = ""
-                            coroutineScope.launch {
-                                engine.sendMessage(textToSend)
-                            }
-                        }
-                    })
-                )
-
-                val canSend = inputText.isNotBlank() && status == AgentStatus.Idle
+                // View History Button
                 IconButton(
-                    onClick = {
-                        if (canSend) {
-                            val textToSend = inputText
-                            inputText = ""
-                            coroutineScope.launch {
-                                engine.sendMessage(textToSend)
-                            }
-                        }
-                    },
-                    enabled = canSend,
+                    onClick = onShowHistory,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
-                        .background(if (canSend) colors.accentCyan else colors.cardBg)
+                        .background(colors.cardBg)
+                        .border(1.dp, colors.borderSubtle, CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = if (canSend) Color.Black else colors.textMuted,
+                        imageVector = Icons.Outlined.BarChart,
+                        contentDescription = "Discipline History",
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
+
+                // AI Settings Button
+                IconButton(
+                    onClick = {
+                        engine.resetStatus()
+                        showSettingsDialog = true
+                    },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(colors.cardBg)
+                        .border(1.dp, colors.borderSubtle, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = "AI Settings",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Clear Chat Button
+                IconButton(
+                    onClick = { engine.clearChat() },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(colors.cardBg)
+                        .border(1.dp, colors.borderSubtle, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = "Clear Chat",
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        // Quick Prompt Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            quickActions.forEach { action ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colors.cardBg)
+                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(16.dp))
+                        .clickable {
+                            coroutineScope.launch {
+                                engine.sendMessage(action)
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        text = action,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+        }
+
+        // Chat Messages List
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
+        ) {
+            items(messages, key = { it.id }) { msg ->
+                when (msg.role) {
+                    "user" -> UserMessageBubble(msg)
+                    "assistant" -> AssistantMessageBubble(msg)
+                    "tool" -> ToolResultBubble(msg)
+                }
+            }
+
+            // Status indicator when processing
+            item {
+                when (val s = status) {
+                    is AgentStatus.Thinking -> {
+                        StatusCard(
+                            text = s.step,
+                            color = colors.textPrimary
+                        )
+                    }
+                    is AgentStatus.ExecutingTool -> {
+                        StatusCard(
+                            text = "Executing: ${s.toolName}...",
+                            color = colors.accentFlame
+                        )
+                    }
+                    is AgentStatus.Error -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.accentFlameSoft)
+                                .border(1.dp, colors.accentFlame.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Error",
+                                    tint = colors.accentFlame,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Agent Error",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = colors.accentFlame
+                                )
+                            }
+                            Text(
+                                text = s.message,
+                                fontSize = 12.sp,
+                                color = colors.textPrimary,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                            )
+                            Button(
+                                onClick = {
+                                    engine.resetStatus()
+                                    showSettingsDialog = true
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.accentFlame),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text("Configure AI & Models", fontSize = 12.sp, color = Color.White)
+                            }
+                        }
+                    }
+                    AgentStatus.Idle -> {}
+                }
+            }
+        }
+
+        // Bottom Input Row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(colors.cardElevated)
+                .border(1.dp, colors.borderSubtle, RoundedCornerShape(26.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextField(
+                value = inputText,
+                onValueChange = { inputText = it },
+                placeholder = {
+                    Text(
+                        "Command Discipline AI...",
+                        fontSize = 13.sp,
+                        color = colors.textMuted
+                    )
+                },
+                modifier = Modifier.weight(1f),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary
+                ),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = {
+                    if (inputText.isNotBlank() && status == AgentStatus.Idle) {
+                        val textToSend = inputText
+                        inputText = ""
+                        coroutineScope.launch {
+                            engine.sendMessage(textToSend)
+                        }
+                    }
+                })
+            )
+
+            val canSend = inputText.isNotBlank() && status == AgentStatus.Idle
+            IconButton(
+                onClick = {
+                    if (canSend) {
+                        val textToSend = inputText
+                        inputText = ""
+                        coroutineScope.launch {
+                            engine.sendMessage(textToSend)
+                        }
+                    }
+                },
+                enabled = canSend,
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(if (canSend) colors.primaryActionBg else colors.cardBg)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (canSend) colors.primaryActionFg else colors.textMuted,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
 
@@ -359,12 +410,13 @@ fun AgentScreen(
                     AiSettings.save(context, updated)
                     currentSettings = updated
                     showSettingsDialog = false
-                    Toast.makeText(context, "Copilot settings updated", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "AI settings saved", Toast.LENGTH_SHORT).show()
                 },
                 onDismiss = { showSettingsDialog = false }
             )
         }
     }
+}
 
 @Composable
 fun UserMessageBubble(msg: ChatMessage) {
@@ -412,17 +464,17 @@ fun AssistantMessageBubble(msg: ChatMessage) {
                     modifier = Modifier.padding(bottom = 6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.AutoAwesome,
-                        contentDescription = "Copilot",
-                        tint = colors.accentCyan,
-                        modifier = Modifier.size(16.dp)
+                        imageVector = Icons.Default.SmartToy,
+                        contentDescription = "AI",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Discipline Copilot",
+                        text = "Discipline AI",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
-                        color = colors.accentCyan
+                        color = colors.textPrimary
                     )
                 }
 
@@ -444,15 +496,15 @@ fun AssistantMessageBubble(msg: ChatMessage) {
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(colors.cardElevated)
-                                .border(1.dp, colors.accentCyan.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .border(1.dp, colors.borderSubtle, RoundedCornerShape(8.dp))
                                 .padding(8.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = null,
-                                    tint = colors.accentCyan,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = colors.textSecondary,
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
@@ -460,7 +512,7 @@ fun AssistantMessageBubble(msg: ChatMessage) {
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = colors.accentCyan
+                                    color = colors.textPrimary
                                 )
                             }
                         }
@@ -499,14 +551,14 @@ fun ToolResultBubble(msg: ChatMessage) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = if (result?.success == true) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        imageVector = if (result?.success == true) Icons.Default.Check else Icons.Default.Warning,
                         contentDescription = null,
                         tint = if (result?.success == true) colors.successGreen else colors.accentFlame,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = result?.summary ?: "Action completed: ${msg.id}",
+                        text = result?.summary ?: "Action complete: ${msg.id}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary,
@@ -542,7 +594,7 @@ fun ToolResultBubble(msg: ChatMessage) {
 }
 
 @Composable
-fun StatusCard(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color) {
+fun StatusCard(text: String, color: Color) {
     val colors = AppTheme.colors
     Row(
         modifier = Modifier
@@ -553,7 +605,7 @@ fun StatusCard(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Stri
         verticalAlignment = Alignment.CenterVertically
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(13.dp),
             strokeWidth = 2.dp,
             color = color
         )
@@ -619,14 +671,14 @@ fun AiSettingsDialog(
                 ) {
                     Column {
                         Text(
-                            text = "COPILOT & MODELS",
+                            text = "AI & MODELS",
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Black,
                             fontSize = 18.sp,
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "Configure Cloud APIs or On-Device Tiny Models",
+                            text = "Configure Cloud APIs or On-Device Models",
                             fontSize = 12.sp,
                             color = colors.textMuted
                         )
@@ -643,7 +695,7 @@ fun AiSettingsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Tabs: [API Providers] [Tiny Models Catalog]
+                // Tabs: [Cloud & APIs] [Tiny Models Catalog]
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -706,7 +758,7 @@ fun AiSettingsDialog(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Provider Chips
+                        // Provider Options
                         AiProvider.values().forEach { provider ->
                             val isSelected = selectedProvider == provider
                             Box(
@@ -717,7 +769,7 @@ fun AiSettingsDialog(
                                     .background(if (isSelected) colors.cardElevated else Color.Transparent)
                                     .border(
                                         1.dp,
-                                        if (isSelected) colors.accentCyan else colors.borderSubtle,
+                                        if (isSelected) colors.primaryActionBg.copy(alpha = 0.6f) else colors.borderSubtle,
                                         RoundedCornerShape(10.dp)
                                     )
                                     .clickable {
@@ -736,7 +788,7 @@ fun AiSettingsDialog(
                                             text = provider.displayName,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             fontSize = 13.5.sp,
-                                            color = if (isSelected) colors.accentCyan else colors.textPrimary
+                                            color = colors.textPrimary
                                         )
                                         Text(
                                             text = "Default: ${provider.defaultModel}",
@@ -748,7 +800,7 @@ fun AiSettingsDialog(
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Selected",
-                                            tint = colors.accentCyan,
+                                            tint = colors.textPrimary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -774,7 +826,7 @@ fun AiSettingsDialog(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.accentCyan,
+                                focusedBorderColor = colors.primaryActionBg,
                                 unfocusedBorderColor = colors.borderSubtle
                             )
                         )
@@ -793,7 +845,7 @@ fun AiSettingsDialog(
                         OutlinedTextField(
                             value = apiKey,
                             onValueChange = { apiKey = it },
-                            placeholder = { Text("Paste your API key here (saved securely on device)", fontSize = 12.sp) },
+                            placeholder = { Text("Paste your API key (saved securely on device)", fontSize = 12.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
@@ -807,16 +859,16 @@ fun AiSettingsDialog(
                                 }
                             },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.accentCyan,
+                                focusedBorderColor = colors.primaryActionBg,
                                 unfocusedBorderColor = colors.borderSubtle
                             )
                         )
 
                         if (selectedProvider == AiProvider.OPENROUTER) {
                             Text(
-                                text = "💡 Tip: OpenRouter offers free models like 'google/gemini-2.0-flash-exp:free' with zero subscription cost.",
+                                text = "OpenRouter supports free models such as google/gemini-2.0-flash-exp:free with no subscription.",
                                 fontSize = 11.sp,
-                                color = colors.accentCyan,
+                                color = colors.textSecondary,
                                 modifier = Modifier.padding(top = 4.dp)
                             )
                         }
@@ -839,7 +891,7 @@ fun AiSettingsDialog(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.accentCyan,
+                                focusedBorderColor = colors.primaryActionBg,
                                 unfocusedBorderColor = colors.borderSubtle
                             )
                         )
@@ -869,11 +921,11 @@ fun AiSettingsDialog(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             if (isTesting) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = colors.accentCyan)
+                                CircularProgressIndicator(modifier = Modifier.size(15.dp), strokeWidth = 2.dp, color = colors.textPrimary)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Testing Connection...", color = colors.textPrimary)
                             } else {
-                                Icon(Icons.Default.Bolt, contentDescription = null, tint = colors.accentCyan)
+                                Icon(Icons.Default.Bolt, contentDescription = null, tint = colors.textPrimary)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Test Connection", color = colors.textPrimary)
                             }
@@ -906,14 +958,14 @@ fun AiSettingsDialog(
                     } else {
                         // TAB 1: TINY MODELS CATALOG
                         Text(
-                            text = "RECOMMENDED ON-DEVICE / LOCAL TINY MODELS",
+                            text = "ON-DEVICE / LOCAL TINY MODELS",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = colors.textMuted
                         )
                         Text(
-                            text = "Run autonomous models locally on your phone or local PC/Wi-Fi via Ollama/llama.cpp.",
+                            text = "Run models locally on phone or local PC/Wi-Fi via Ollama or llama.cpp.",
                             fontSize = 12.sp,
                             color = colors.textSecondary,
                             modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
@@ -923,7 +975,7 @@ fun AiSettingsDialog(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
+                                    .padding(vertical = 5.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(colors.cardElevated)
                                     .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
@@ -945,14 +997,15 @@ fun AiSettingsDialog(
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(colors.accentCyan.copy(alpha = 0.15f))
+                                                .background(colors.cardBg)
+                                                .border(1.dp, colors.borderSubtle, RoundedCornerShape(6.dp))
                                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                                         ) {
                                             Text(
                                                 text = model.downloadSize,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = colors.accentCyan
+                                                color = colors.textSecondary
                                             )
                                         }
                                     }
@@ -1000,7 +1053,7 @@ fun AiSettingsDialog(
                                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                                 val clip = ClipData.newPlainText("GGUF URL", model.defaultUrl)
                                                 clipboard.setPrimaryClip(clip)
-                                                Toast.makeText(context, "Direct GGUF link copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Direct GGUF link copied to clipboard", Toast.LENGTH_SHORT).show()
                                             },
                                             shape = RoundedCornerShape(8.dp),
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
@@ -1022,22 +1075,22 @@ fun AiSettingsDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(colors.cardBg)
-                                .border(1.dp, colors.accentCyan.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
                                 .padding(12.dp)
                         ) {
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Info, contentDescription = null, tint = colors.accentCyan, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Info, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(15.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "How to run Tiny Models locally",
+                                        text = "Local Execution Instructions",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
-                                        color = colors.accentCyan
+                                        color = colors.textPrimary
                                     )
                                 }
                                 Text(
-                                    text = "1. On PC / Mac / Termux: Run 'ollama run gemma2:2b'\n2. Set Ollama base URL in Cloud & APIs tab: 'http://<your-pc-ip>:11434/v1/chat/completions'\n3. On-Device: Use Termux + llama.cpp server on port 8080.\nDiscipline Copilot connects seamlessly over Wi-Fi or localhost!",
+                                    text = "1. Local PC / Wi-Fi: Run 'ollama run gemma2:2b'\n2. Set Ollama base URL in Cloud & APIs tab: 'http://<your-pc-ip>:11434/v1/chat/completions'\n3. On-Device: Use Termux with llama.cpp server on port 8080.\nDiscipline AI connects directly over Wi-Fi or localhost.",
                                     fontSize = 11.5.sp,
                                     lineHeight = 16.sp,
                                     color = colors.textSecondary,
