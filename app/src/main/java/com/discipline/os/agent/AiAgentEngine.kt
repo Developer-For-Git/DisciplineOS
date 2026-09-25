@@ -80,6 +80,15 @@ class AiAgentEngine(
         val userMsg = ChatMessage(role = "user", content = userText.trim())
         _messages.value = _messages.value + userMsg
 
+        if (settings.provider.requiresApiKey && settings.apiKey.isBlank()) {
+            _status.value = AgentStatus.Idle
+            _messages.value = _messages.value + ChatMessage(
+                role = "assistant",
+                content = "**AI Model Configuration Required**\n\nNo API Key is configured for ${settings.provider.displayName}.\n\nPlease tap the **Settings** icon in the header to configure a **Cloud API** (OpenRouter, OpenAI, Claude) or select an **On-Device / Local Model**."
+            )
+            return@withContext
+        }
+
         _status.value = AgentStatus.Thinking("Contacting ${settings.provider.displayName}...")
 
         try {

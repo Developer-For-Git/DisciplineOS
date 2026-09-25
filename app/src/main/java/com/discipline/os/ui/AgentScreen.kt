@@ -1,8 +1,13 @@
 package com.discipline.os.ui
 
+import android.app.DownloadManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Environment
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -32,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -42,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.discipline.os.agent.*
 import kotlinx.coroutines.launch
 
@@ -618,6 +626,56 @@ fun StatusCard(text: String, color: Color) {
     }
 }
 
+object ModelDownloadHelper {
+    fun downloadModel(context: Context, modelName: String, url: String) {
+        try {
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+            if (downloadManager == null) {
+                fallbackToBrowser(context, url)
+                return
+            }
+            val uri = Uri.parse(url)
+            val fileName = uri.lastPathSegment?.takeIf { it.endsWith(".gguf", ignoreCase = true) }
+                ?: "${modelName.lowercase().replace(" ", "_").replace(":", "_")}.gguf"
+
+            val request = DownloadManager.Request(uri).apply {
+                setTitle("DisciplineOS: $modelName")
+                setDescription("Downloading AI Model ($fileName)")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS,
+                    "DisciplineOS/models/$fileName"
+                )
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(false)
+            }
+            downloadManager.enqueue(request)
+            Toast.makeText(context, "Download started for $modelName. Check notification bar.", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            fallbackToBrowser(context, url)
+        }
+    }
+
+    private fun fallbackToBrowser(context: Context, url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Toast.makeText(context, "Opening direct download in browser...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to start download: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
+enum class AiDialogScreen {
+    TYPE_SELECT,
+    CLOUD_LIST,
+    PROVIDER_CONFIG,
+    TINY_MODELS
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiSettingsDialog(
@@ -630,507 +688,1059 @@ fun AiSettingsDialog(
     val coroutineScope = rememberCoroutineScope()
     val colors = AppTheme.colors
 
-    var selectedTab by remember { mutableStateOf(0) } // 0 = API Providers, 1 = Tiny Models Catalog
+    var currentScreen by remember { mutableStateOf(AiDialogScreen.TYPE_SELECT) }
 
-    // Form states
+    // Form states for provider config
     var selectedProvider by remember { mutableStateOf(currentSettings.provider) }
     var apiKey by remember { mutableStateOf(currentSettings.apiKey) }
     var modelName by remember { mutableStateOf(currentSettings.modelName) }
     var customBaseUrl by remember { mutableStateOf(currentSettings.customBaseUrl) }
     var showApiKey by remember { mutableStateOf(false) }
 
+    // Custom model downloader states
+    var customModelName by remember { mutableStateOf("") }
+    var customModelUrl by remember { mutableStateOf("") }
+
+    // Ollama specific config states
+    var ollamaBaseUrl by remember {
+        mutableStateOf(
+            if (currentSettings.provider == AiProvider.OLLAMA && currentSettings.customBaseUrl.isNotBlank()) {
+                currentSettings.customBaseUrl
+            } else {
+                AiProvider.OLLAMA.defaultBaseUrl
+            }
+        )
+    }
+    var ollamaModelName by remember {
+        mutableStateOf(
+            if (currentSettings.provider == AiProvider.OLLAMA && currentSettings.modelName.isNotBlank()) {
+                currentSettings.modelName
+            } else {
+                AiProvider.OLLAMA.defaultModel
+            }
+        )
+    }
+
     // Test connection states
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
+    // Device back navigation
+    BackHandler {
+        when (currentScreen) {
+            AiDialogScreen.TYPE_SELECT -> onDismiss()
+            AiDialogScreen.CLOUD_LIST -> currentScreen = AiDialogScreen.TYPE_SELECT
+            AiDialogScreen.PROVIDER_CONFIG -> currentScreen = AiDialogScreen.CLOUD_LIST
+            AiDialogScreen.TINY_MODELS -> currentScreen = AiDialogScreen.TYPE_SELECT
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            dialogWindow?.let { win ->
+                win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                WindowCompat.setDecorFitsSystemWindows(win, false)
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colors.canvasBg.copy(alpha = 0.96f))
+                .background(Color.Black.copy(alpha = 0.75f))
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(top = 16.dp, bottom = 72.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(colors.cardBg)
-                    .border(1.dp, colors.borderSubtle, RoundedCornerShape(20.dp))
-                    .padding(20.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
+                color = colors.cardBg,
+                shape = RoundedCornerShape(18.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderSubtle)
             ) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "AI & MODELS",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp,
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = "Configure Cloud APIs or On-Device Models",
-                            fontSize = 12.sp,
-                            color = colors.textMuted
-                        )
-                    }
-
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = colors.textSecondary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Tabs: [Cloud & APIs] [Tiny Models Catalog]
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(colors.cardElevated)
-                        .padding(4.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedTab == 0) colors.primaryActionBg else Color.Transparent)
-                            .clickable { selectedTab = 0 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Cloud & APIs",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (selectedTab == 0) colors.primaryActionFg else colors.textMuted
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (selectedTab == 1) colors.primaryActionBg else Color.Transparent)
-                            .clickable { selectedTab = 1 }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Tiny Models Catalog",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (selectedTab == 1) colors.primaryActionFg else colors.textMuted
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Scrollable tab content
                 Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    if (selectedTab == 0) {
-                        // TAB 0: API PROVIDERS CONFIG
-                        Text(
-                            text = "SELECT PROVIDER",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textMuted
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Provider Options
-                        AiProvider.values().forEach { provider ->
-                            val isSelected = selectedProvider == provider
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) colors.cardElevated else Color.Transparent)
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) colors.primaryActionBg.copy(alpha = 0.6f) else colors.borderSubtle,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable {
-                                        selectedProvider = provider
-                                        modelName = provider.defaultModel
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = provider.displayName,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 13.5.sp,
-                                            color = colors.textPrimary
-                                        )
-                                        Text(
-                                            text = "Default: ${provider.defaultModel}",
-                                            fontSize = 11.sp,
-                                            color = colors.textMuted
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = colors.textPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Model Name
-                        Text(
-                            text = "MODEL IDENTIFIER",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textMuted
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = modelName,
-                            onValueChange = { modelName = it },
-                            placeholder = { Text(selectedProvider.defaultModel, fontSize = 13.sp) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.primaryActionBg,
-                                unfocusedBorderColor = colors.borderSubtle
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // API Key
-                        Text(
-                            text = "API KEY",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textMuted
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = apiKey,
-                            onValueChange = { apiKey = it },
-                            placeholder = { Text("Paste your API key (saved securely on device)", fontSize = 12.sp) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
-                            trailingIcon = {
-                                IconButton(onClick = { showApiKey = !showApiKey }) {
-                                    Icon(
-                                        imageVector = if (showApiKey) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                        contentDescription = "Toggle Key",
-                                        tint = colors.textMuted
-                                    )
-                                }
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.primaryActionBg,
-                                unfocusedBorderColor = colors.borderSubtle
-                            )
-                        )
-
-                        if (selectedProvider == AiProvider.OPENROUTER) {
-                            Text(
-                                text = "OpenRouter supports free models such as google/gemini-2.0-flash-exp:free with no subscription.",
-                                fontSize = 11.sp,
-                                color = colors.textSecondary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Custom Base URL (Optional / Local server)
-                        Text(
-                            text = "CUSTOM BASE URL (OPTIONAL)",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textMuted
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = customBaseUrl,
-                            onValueChange = { customBaseUrl = it },
-                            placeholder = { Text(selectedProvider.defaultBaseUrl, fontSize = 12.sp) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = colors.primaryActionBg,
-                                unfocusedBorderColor = colors.borderSubtle
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Test Connection Button
-                        Button(
-                            onClick = {
-                                isTesting = true
-                                testResult = null
-                                coroutineScope.launch {
-                                    val tempSettings = AiSettings(
-                                        provider = selectedProvider,
-                                        apiKey = apiKey,
-                                        modelName = modelName.ifBlank { selectedProvider.defaultModel },
-                                        customBaseUrl = customBaseUrl
-                                    )
-                                    val res = engine.testConnection(tempSettings)
-                                    isTesting = false
-                                    testResult = res
-                                }
-                            },
-                            enabled = !isTesting,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = colors.cardElevated),
-                            shape = RoundedCornerShape(10.dp)
+                    // Header Bar (fixed)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isTesting) {
-                                CircularProgressIndicator(modifier = Modifier.size(15.dp), strokeWidth = 2.dp, color = colors.textPrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Testing Connection...", color = colors.textPrimary)
-                            } else {
-                                Icon(Icons.Default.Bolt, contentDescription = null, tint = colors.textPrimary)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Test Connection", color = colors.textPrimary)
-                            }
-                        }
-
-                        // Test Result Banner
-                        testResult?.let { (success, msg) ->
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (success) colors.successGreenSoft else colors.accentFlameSoft)
-                                    .border(
-                                        1.dp,
-                                        if (success) colors.successGreen else colors.accentFlame,
-                                        RoundedCornerShape(8.dp)
+                            if (currentScreen != AiDialogScreen.TYPE_SELECT) {
+                                IconButton(
+                                    onClick = {
+                                        when (currentScreen) {
+                                            AiDialogScreen.CLOUD_LIST -> currentScreen = AiDialogScreen.TYPE_SELECT
+                                            AiDialogScreen.PROVIDER_CONFIG -> currentScreen = AiDialogScreen.CLOUD_LIST
+                                            AiDialogScreen.TINY_MODELS -> currentScreen = AiDialogScreen.TYPE_SELECT
+                                            else -> {}
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back",
+                                        tint = colors.textPrimary,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    .padding(10.dp)
-                            ) {
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+
+                            Column {
                                 Text(
-                                    text = msg,
-                                    fontSize = 11.5.sp,
+                                    text = when (currentScreen) {
+                                        AiDialogScreen.TYPE_SELECT -> "AI CONFIGURATION"
+                                        AiDialogScreen.CLOUD_LIST -> "CLOUD PROVIDERS"
+                                        AiDialogScreen.PROVIDER_CONFIG -> selectedProvider.displayName.uppercase()
+                                        AiDialogScreen.TINY_MODELS -> "TINY MODELS & OLLAMA"
+                                    },
                                     fontFamily = FontFamily.Monospace,
-                                    color = colors.textPrimary
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 15.sp,
+                                    color = colors.textPrimary,
+                                    letterSpacing = 0.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = when (currentScreen) {
+                                        AiDialogScreen.TYPE_SELECT -> "Select engine architecture"
+                                        AiDialogScreen.CLOUD_LIST -> "Select provider to configure"
+                                        AiDialogScreen.PROVIDER_CONFIG -> "API keys & model endpoint"
+                                        AiDialogScreen.TINY_MODELS -> "Direct GGUF downloads & local runner"
+                                    },
+                                    fontSize = 11.sp,
+                                    color = colors.textMuted
                                 )
                             }
                         }
 
-                    } else {
-                        // TAB 1: TINY MODELS CATALOG
-                        Text(
-                            text = "ON-DEVICE / LOCAL TINY MODELS",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textMuted
-                        )
-                        Text(
-                            text = "Run models locally on phone or local PC/Wi-Fi via Ollama or llama.cpp.",
-                            fontSize = 12.sp,
-                            color = colors.textSecondary,
-                            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-                        )
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = colors.textSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
 
-                        TinyModelCatalog.models.forEach { model ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 5.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(colors.cardElevated)
-                                    .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
-                                    .padding(14.dp)
-                            ) {
-                                Column {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = model.name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = colors.textPrimary
-                                        )
+                    Spacer(modifier = Modifier.height(12.dp))
 
+                    // Scrollable Body (takes remaining space)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        when (currentScreen) {
+                            AiDialogScreen.TYPE_SELECT -> {
+                                val isConfigured = if (currentSettings.provider == AiProvider.OLLAMA) {
+                                    currentSettings.modelName.isNotBlank()
+                                } else {
+                                    currentSettings.apiKey.isNotBlank()
+                                }
+
+                                // Active Engine Banner
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colors.cardElevated)
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
                                             modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(colors.cardBg)
-                                                .border(1.dp, colors.borderSubtle, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isConfigured) colors.successGreen else colors.accentFlame)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
                                             Text(
-                                                text = model.downloadSize,
-                                                fontSize = 10.sp,
+                                                text = if (isConfigured) "ACTIVE: ${currentSettings.provider.displayName.uppercase()}" else "NO AI MODEL CONFIGURED",
+                                                fontFamily = FontFamily.Monospace,
                                                 fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = colors.textPrimary
+                                            )
+                                            Text(
+                                                text = if (isConfigured) "Model: ${currentSettings.modelName}" else "Configure Cloud API or Local LLM below to chat.",
+                                                fontSize = 11.sp,
                                                 color = colors.textSecondary
                                             )
                                         }
                                     }
+                                }
 
-                                    Text(
-                                        text = "${model.parameters} • Min ${model.minRam}",
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = colors.textMuted,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                                    Text(
-                                        text = model.description,
-                                        fontSize = 12.sp,
-                                        color = colors.textSecondary,
-                                        modifier = Modifier.padding(top = 6.dp, bottom = 10.dp)
-                                    )
+                                Text(
+                                    text = "SELECT ARCHITECTURE",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textMuted
+                                )
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Card 1: Cloud Intelligence
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(colors.cardElevated)
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(14.dp))
+                                        .clickable { currentScreen = AiDialogScreen.CLOUD_LIST }
+                                        .padding(14.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(colors.cardBg)
+                                                .border(1.dp, colors.borderSubtle, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Cloud,
+                                                contentDescription = null,
+                                                tint = colors.textPrimary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Cloud Intelligence (API)",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = colors.textPrimary
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Default.ChevronRight,
+                                                    contentDescription = null,
+                                                    tint = colors.textMuted,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = "OpenRouter, OpenAI, Claude, NVIDIA NIM, Custom",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 10.5.sp,
+                                                color = colors.textMuted,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                            Text(
+                                                text = "Hosted reasoning models with tool execution, web access, and sub-second generation speeds.",
+                                                fontSize = 11.5.sp,
+                                                color = colors.textSecondary,
+                                                modifier = Modifier.padding(top = 6.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Card 2: On-Device & Local LLMs
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(colors.cardElevated)
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(14.dp))
+                                        .clickable { currentScreen = AiDialogScreen.TINY_MODELS }
+                                        .padding(14.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(colors.cardBg)
+                                                .border(1.dp, colors.borderSubtle, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Memory,
+                                                contentDescription = null,
+                                                tint = colors.textPrimary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "On-Device & Local LLMs",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = colors.textPrimary
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Default.ChevronRight,
+                                                    contentDescription = null,
+                                                    tint = colors.textMuted,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = "Google Gemma 2, Qwen 2.5, Phi-3.5, Ollama",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 10.5.sp,
+                                                color = colors.textMuted,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                            Text(
+                                                text = "Download small GGUF weights directly to phone storage, or link with Ollama running on your local Wi-Fi.",
+                                                fontSize = 11.5.sp,
+                                                color = colors.textSecondary,
+                                                modifier = Modifier.padding(top = 6.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            AiDialogScreen.CLOUD_LIST -> {
+                                Text(
+                                    text = "SELECT CLOUD PROVIDER",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textMuted
+                                )
+                                Text(
+                                    text = "Tap any provider to open its dedicated configuration window.",
+                                    fontSize = 12.sp,
+                                    color = colors.textSecondary,
+                                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                                )
+
+                                val cloudProviders = listOf(
+                                    AiProvider.OPENROUTER to "Unified gateway for 300+ models (Gemini, Claude, Llama). Recommended.",
+                                    AiProvider.OPENAI to "Official OpenAI API for GPT-4o and GPT-4o-mini.",
+                                    AiProvider.ANTHROPIC to "Direct Claude 3.5 Sonnet & Claude 3.5 Haiku API.",
+                                    AiProvider.NVIDIA_NIM to "High-throughput enterprise AI inference endpoints.",
+                                    AiProvider.CUSTOM to "Connect any custom OpenAI-compatible server or proxy."
+                                )
+
+                                cloudProviders.forEach { (provider, desc) ->
+                                    val isCurrentActive = currentSettings.provider == provider
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 5.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colors.cardElevated)
+                                            .border(
+                                                1.dp,
+                                                if (isCurrentActive) colors.primaryActionBg else colors.borderSubtle,
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .clickable {
+                                                selectedProvider = provider
+                                                apiKey = if (currentSettings.provider == provider) currentSettings.apiKey else ""
+                                                modelName = if (currentSettings.provider == provider) currentSettings.modelName else provider.defaultModel
+                                                customBaseUrl = if (currentSettings.provider == provider) currentSettings.customBaseUrl else provider.defaultBaseUrl
+                                                testResult = null
+                                                currentScreen = AiDialogScreen.PROVIDER_CONFIG
+                                            }
+                                            .padding(14.dp)
                                     ) {
+                                        Column {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = provider.displayName,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = colors.textPrimary
+                                                )
+
+                                                if (isCurrentActive) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .background(colors.primaryActionBg)
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "ACTIVE",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            color = colors.primaryActionFg
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Text(
+                                                text = desc,
+                                                fontSize = 11.5.sp,
+                                                color = colors.textSecondary,
+                                                modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+                                            )
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "Default: ${provider.defaultModel}",
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontSize = 10.sp,
+                                                    color = colors.textMuted,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                                )
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "Configure",
+                                                        fontSize = 11.sp,
+                                                        color = colors.textPrimary,
+                                                        fontWeight = FontWeight.Medium,
+                                                        maxLines = 1
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Icon(
+                                                        imageVector = Icons.Default.ChevronRight,
+                                                        contentDescription = null,
+                                                        tint = colors.textSecondary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            AiDialogScreen.PROVIDER_CONFIG -> {
+                                val helpHint = when (selectedProvider) {
+                                    AiProvider.OPENROUTER -> "Get an API key at openrouter.ai/keys (Free & paid models available)"
+                                    AiProvider.OPENAI -> "Get an API key at platform.openai.com/api-keys"
+                                    AiProvider.ANTHROPIC -> "Get an API key at console.anthropic.com/settings/keys"
+                                    AiProvider.NVIDIA_NIM -> "Get an API key at build.nvidia.com"
+                                    AiProvider.CUSTOM -> "Enter your custom base URL and API key (if required)"
+                                    else -> ""
+                                }
+
+                                if (helpHint.isNotBlank()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(colors.cardElevated)
+                                            .border(1.dp, colors.borderSubtle, RoundedCornerShape(8.dp))
+                                            .padding(10.dp)
+                                    ) {
+                                        Text(
+                                            text = helpHint,
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = colors.textSecondary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+
+                                // API Key Field
+                                OutlinedTextField(
+                                    value = apiKey,
+                                    onValueChange = { apiKey = it },
+                                    label = { Text("API Key", fontSize = 12.sp) },
+                                    placeholder = { Text("Paste key here...", fontSize = 12.sp, color = colors.textMuted) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(onClick = { showApiKey = !showApiKey }) {
+                                                Icon(
+                                                    imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                    contentDescription = "Toggle API Key",
+                                                    tint = colors.textSecondary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                val item = clipboard.primaryClip?.getItemAt(0)
+                                                val text = item?.text?.toString() ?: ""
+                                                if (text.isNotBlank()) {
+                                                    apiKey = text.trim()
+                                                    Toast.makeText(context, "Pasted key", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ContentPaste,
+                                                    contentDescription = "Paste",
+                                                    tint = colors.textSecondary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.primaryActionBg,
+                                        unfocusedBorderColor = colors.borderSubtle
+                                    )
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Model Identifier Field
+                                OutlinedTextField(
+                                    value = modelName,
+                                    onValueChange = { modelName = it },
+                                    label = { Text("Model Identifier", fontSize = 12.sp) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = colors.primaryActionBg,
+                                        unfocusedBorderColor = colors.borderSubtle
+                                    )
+                                )
+
+                                // Model Suggestions Chips
+                                val suggestions = when (selectedProvider) {
+                                    AiProvider.OPENROUTER -> listOf(
+                                        "google/gemini-2.0-flash-exp:free",
+                                        "anthropic/claude-3.5-sonnet",
+                                        "meta-llama/llama-3.3-70b-instruct",
+                                        "deepseek/deepseek-chat"
+                                    )
+                                    AiProvider.OPENAI -> listOf(
+                                        "gpt-4o-mini",
+                                        "gpt-4o"
+                                    )
+                                    AiProvider.ANTHROPIC -> listOf(
+                                        "claude-3-5-haiku-20241022",
+                                        "claude-3-5-sonnet-20241022"
+                                    )
+                                    AiProvider.NVIDIA_NIM -> listOf(
+                                        "meta/llama-3.3-70b-instruct",
+                                        "nvidia/nemotron-4-340b-instruct"
+                                    )
+                                    else -> emptyList()
+                                }
+
+                                if (suggestions.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        suggestions.forEach { sug ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (modelName == sug) colors.primaryActionBg else colors.cardElevated)
+                                                    .border(1.dp, colors.borderSubtle, RoundedCornerShape(6.dp))
+                                                    .clickable { modelName = sug }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = sug,
+                                                    fontSize = 10.sp,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = if (modelName == sug) colors.primaryActionFg else colors.textSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (selectedProvider == AiProvider.CUSTOM || selectedProvider == AiProvider.NVIDIA_NIM) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = customBaseUrl,
+                                        onValueChange = { customBaseUrl = it },
+                                        label = { Text("Base URL Endpoint", fontSize = 12.sp) },
+                                        placeholder = { Text(selectedProvider.defaultBaseUrl, fontSize = 11.sp, color = colors.textMuted) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = colors.primaryActionBg,
+                                            unfocusedBorderColor = colors.borderSubtle
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Test API Connection Button
+                                Button(
+                                    onClick = {
+                                        isTesting = true
+                                        testResult = null
+                                        coroutineScope.launch {
+                                            val tempSettings = AiSettings(
+                                                provider = selectedProvider,
+                                                apiKey = apiKey.trim(),
+                                                modelName = modelName.trim().ifBlank { selectedProvider.defaultModel },
+                                                customBaseUrl = customBaseUrl.trim()
+                                            )
+                                            val res = engine.testConnection(tempSettings)
+                                            isTesting = false
+                                            testResult = res
+                                        }
+                                    },
+                                    enabled = !isTesting,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.cardElevated),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    if (isTesting) {
+                                        CircularProgressIndicator(modifier = Modifier.size(15.dp), strokeWidth = 2.dp, color = colors.textPrimary)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Testing API Connection...", color = colors.textPrimary, fontSize = 12.sp)
+                                    } else {
+                                        Icon(Icons.Default.Bolt, contentDescription = null, tint = colors.textPrimary, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Test API Connection", color = colors.textPrimary, fontSize = 12.sp)
+                                    }
+                                }
+
+                                // Test Result Display
+                                testResult?.let { (success, msg) ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (success) colors.successGreenSoft else colors.accentFlameSoft)
+                                            .border(
+                                                1.dp,
+                                                if (success) colors.successGreen else colors.accentFlame,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(10.dp)
+                                    ) {
+                                        Text(
+                                            text = msg,
+                                            fontSize = 11.5.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = colors.textPrimary
+                                        )
+                                    }
+                                }
+                            }
+
+                            AiDialogScreen.TINY_MODELS -> {
+                                Text(
+                                    text = "ON-DEVICE & TINY MODELS CATALOG",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textMuted
+                                )
+                                Text(
+                                    text = "Direct GGUF model downloads to /Downloads/DisciplineOS/models/ or connect to local Ollama.",
+                                    fontSize = 11.5.sp,
+                                    color = colors.textSecondary,
+                                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                                )
+
+                                // Curated Models List
+                                TinyModelCatalog.models.forEach { model ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 5.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colors.cardElevated)
+                                            .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
+                                            .padding(14.dp)
+                                    ) {
+                                        Column {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = model.name,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.5.sp,
+                                                    color = colors.textPrimary
+                                                )
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(colors.cardBg)
+                                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = model.downloadSize,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = colors.textSecondary
+                                                    )
+                                                }
+                                            }
+
+                                            Text(
+                                                text = "${model.parameters} • Min ${model.minRam}",
+                                                fontSize = 10.5.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = colors.textMuted,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+
+                                            Text(
+                                                text = model.description,
+                                                fontSize = 11.5.sp,
+                                                color = colors.textSecondary,
+                                                modifier = Modifier.padding(top = 6.dp, bottom = 10.dp)
+                                            )
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        ModelDownloadHelper.downloadModel(context, model.name, model.defaultUrl)
+                                                    },
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = colors.primaryActionBg),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Download, contentDescription = null, tint = colors.primaryActionFg, modifier = Modifier.size(14.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Download GGUF", fontSize = 11.sp, color = colors.primaryActionFg)
+                                                }
+
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                        val clip = ClipData.newPlainText("GGUF URL", model.defaultUrl)
+                                                        clipboard.setPrimaryClip(clip)
+                                                        Toast.makeText(context, "Direct link copied", Toast.LENGTH_SHORT).show()
+                                                    },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                                ) {
+                                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Copy URL", fontSize = 11.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Custom Model Downloader Card
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colors.cardBg)
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "DOWNLOAD CUSTOM MODEL",
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            color = colors.textPrimary
+                                        )
+                                        Text(
+                                            text = "Enter any direct .gguf file URL to download directly onto your phone.",
+                                            fontSize = 11.sp,
+                                            color = colors.textSecondary,
+                                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                                        )
+
+                                        OutlinedTextField(
+                                            value = customModelName,
+                                            onValueChange = { customModelName = it },
+                                            label = { Text("Model Name", fontSize = 11.sp) },
+                                            placeholder = { Text("e.g. MyCustom-GGUF", fontSize = 11.sp, color = colors.textMuted) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = colors.primaryActionBg,
+                                                unfocusedBorderColor = colors.borderSubtle
+                                            )
+                                        )
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        OutlinedTextField(
+                                            value = customModelUrl,
+                                            onValueChange = { customModelUrl = it },
+                                            label = { Text("Direct GGUF URL", fontSize = 11.sp) },
+                                            placeholder = { Text("https://huggingface.co/.../model.gguf", fontSize = 11.sp, color = colors.textMuted) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = colors.primaryActionBg,
+                                                unfocusedBorderColor = colors.borderSubtle
+                                            )
+                                        )
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
                                         Button(
                                             onClick = {
-                                                selectedProvider = AiProvider.OLLAMA
-                                                modelName = if (model.id.contains("gemma")) "gemma2:2b"
-                                                            else if (model.id.contains("llama-3.2-1b")) "llama3.2:1b"
-                                                            else if (model.id.contains("llama-3.2-3b")) "llama3.2:3b"
-                                                            else if (model.id.contains("qwen")) "qwen2.5:3b"
-                                                            else "phi3.5:latest"
-                                                selectedTab = 0
-                                                Toast.makeText(context, "Configured provider as Ollama with ${model.name}", Toast.LENGTH_SHORT).show()
+                                                if (customModelUrl.isNotBlank()) {
+                                                    val name = customModelName.ifBlank { "Custom-Model" }
+                                                    ModelDownloadHelper.downloadModel(context, name, customModelUrl.trim())
+                                                } else {
+                                                    Toast.makeText(context, "Please enter a valid URL", Toast.LENGTH_SHORT).show()
+                                                }
                                             },
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier.fillMaxWidth(),
                                             colors = ButtonDefaults.buttonColors(containerColor = colors.secondaryActionBg),
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(vertical = 4.dp)
+                                            shape = RoundedCornerShape(8.dp)
                                         ) {
-                                            Text("Select for Ollama", fontSize = 11.sp, color = colors.secondaryActionFg)
+                                            Icon(Icons.Default.Download, contentDescription = null, tint = colors.secondaryActionFg, modifier = Modifier.size(15.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Download to Phone", color = colors.secondaryActionFg, fontSize = 12.sp)
                                         }
+                                    }
+                                }
 
-                                        OutlinedButton(
-                                            onClick = {
-                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                                val clip = ClipData.newPlainText("GGUF URL", model.defaultUrl)
-                                                clipboard.setPrimaryClip(clip)
-                                                Toast.makeText(context, "Direct GGUF link copied to clipboard", Toast.LENGTH_SHORT).show()
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Local Ollama Server Card
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(colors.cardBg)
+                                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
+                                        .padding(12.dp)
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "LOCAL OLLAMA SERVER (WI-FI)",
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            color = colors.textPrimary
+                                        )
+                                        Text(
+                                            text = "Connect to an Ollama server running on your PC or Mac on the same network.",
+                                            fontSize = 11.sp,
+                                            color = colors.textSecondary,
+                                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                                        )
+
+                                        OutlinedTextField(
+                                            value = ollamaBaseUrl,
+                                            onValueChange = { ollamaBaseUrl = it },
+                                            label = { Text("Ollama URL Endpoint", fontSize = 11.sp) },
+                                            placeholder = { Text("http://192.168.1.100:11434/v1/chat/completions", fontSize = 11.sp, color = colors.textMuted) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = colors.primaryActionBg,
+                                                unfocusedBorderColor = colors.borderSubtle
+                                            )
+                                        )
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        OutlinedTextField(
+                                            value = ollamaModelName,
+                                            onValueChange = { ollamaModelName = it },
+                                            label = { Text("Model Tag", fontSize = 11.sp) },
+                                            placeholder = { Text("e.g. gemma2:2b or qwen2.5:3b", fontSize = 11.sp, color = colors.textMuted) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = colors.primaryActionBg,
+                                                unfocusedBorderColor = colors.borderSubtle
+                                            )
+                                        )
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Copy GGUF", fontSize = 11.sp)
+                                            OutlinedButton(
+                                                onClick = {
+                                                    isTesting = true
+                                                    testResult = null
+                                                    coroutineScope.launch {
+                                                        val tempSettings = AiSettings(
+                                                            provider = AiProvider.OLLAMA,
+                                                            apiKey = "",
+                                                            modelName = ollamaModelName.trim().ifBlank { AiProvider.OLLAMA.defaultModel },
+                                                            customBaseUrl = ollamaBaseUrl.trim()
+                                                        )
+                                                        val res = engine.testConnection(tempSettings)
+                                                        isTesting = false
+                                                        testResult = res
+                                                    }
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("Test Server", fontSize = 11.sp)
+                                            }
+
+                                            Button(
+                                                onClick = {
+                                                    val updated = currentSettings.copy(
+                                                        provider = AiProvider.OLLAMA,
+                                                        apiKey = "",
+                                                        modelName = ollamaModelName.trim().ifBlank { AiProvider.OLLAMA.defaultModel },
+                                                        customBaseUrl = ollamaBaseUrl.trim()
+                                                    )
+                                                    onSave(updated)
+                                                    Toast.makeText(context, "Activated Ollama", Toast.LENGTH_SHORT).show()
+                                                    onDismiss()
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                colors = ButtonDefaults.buttonColors(containerColor = colors.primaryActionBg),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("Activate Ollama", fontSize = 11.sp, color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                        // Local Runner Setup Help Card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(colors.cardBg)
-                                .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
-                                .padding(12.dp)
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Info, contentDescription = null, tint = colors.textSecondary, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Local Execution Instructions",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = colors.textPrimary
-                                    )
-                                }
-                                Text(
-                                    text = "1. Local PC / Wi-Fi: Run 'ollama run gemma2:2b'\n2. Set Ollama base URL in Cloud & APIs tab: 'http://<your-pc-ip>:11434/v1/chat/completions'\n3. On-Device: Use Termux with llama.cpp server on port 8080.\nDiscipline AI connects directly over Wi-Fi or localhost.",
-                                    fontSize = 11.5.sp,
-                                    lineHeight = 16.sp,
-                                    color = colors.textSecondary,
-                                    modifier = Modifier.padding(top = 6.dp)
-                                )
+                    // Bottom Action Bar (Fixed, never obscured)
+                    when (currentScreen) {
+                        AiDialogScreen.TYPE_SELECT -> {
+                            Button(
+                                onClick = onDismiss,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.cardElevated),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Close", color = colors.textPrimary)
                             }
                         }
-                    }
-                }
+                        AiDialogScreen.CLOUD_LIST -> {
+                            OutlinedButton(
+                                onClick = { currentScreen = AiDialogScreen.TYPE_SELECT },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Back to Architecture", color = colors.textSecondary)
+                            }
+                        }
+                        AiDialogScreen.PROVIDER_CONFIG -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { currentScreen = AiDialogScreen.CLOUD_LIST },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Back", color = colors.textSecondary)
+                                }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                                Button(
+                                    onClick = {
+                                        val updated = currentSettings.copy(
+                                            provider = selectedProvider,
+                                            apiKey = apiKey.trim(),
+                                            modelName = modelName.trim().ifBlank { selectedProvider.defaultModel },
+                                            customBaseUrl = customBaseUrl.trim()
+                                        )
+                                        onSave(updated)
+                                        Toast.makeText(context, "Activated ${selectedProvider.displayName}", Toast.LENGTH_SHORT).show()
+                                        onDismiss()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.primaryActionBg),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Save & Activate", color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        AiDialogScreen.TINY_MODELS -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { currentScreen = AiDialogScreen.TYPE_SELECT },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Back to Architecture", color = colors.textSecondary)
+                                }
 
-                // Bottom Action Buttons: Cancel and Save
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Cancel", color = colors.textSecondary)
-                    }
-
-                    Button(
-                        onClick = {
-                            val updated = currentSettings.copy(
-                                provider = selectedProvider,
-                                apiKey = apiKey.trim(),
-                                modelName = modelName.trim().ifBlank { selectedProvider.defaultModel },
-                                customBaseUrl = customBaseUrl.trim()
-                            )
-                            onSave(updated)
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.primaryActionBg),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Save Settings", color = colors.primaryActionFg, fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = onDismiss,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.cardElevated),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Done", color = colors.textPrimary)
+                                }
+                            }
+                        }
                     }
                 }
             }

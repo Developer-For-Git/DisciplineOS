@@ -8,7 +8,8 @@ enum class AiProvider(
     val defaultBaseUrl: String,
     val defaultModel: String,
     val defaultHeaderAuthKey: String = "Authorization",
-    val authPrefix: String = "Bearer "
+    val authPrefix: String = "Bearer ",
+    val requiresApiKey: Boolean = true
 ) {
     OPENROUTER(
         displayName = "OpenRouter (Recommended)",
@@ -30,7 +31,8 @@ enum class AiProvider(
     OLLAMA(
         displayName = "Ollama (Local / Wi-Fi)",
         defaultBaseUrl = "http://10.0.2.2:11434/v1/chat/completions",
-        defaultModel = "gemma2:2b"
+        defaultModel = "gemma2:2b",
+        requiresApiKey = false
     ),
     NVIDIA_NIM(
         displayName = "NVIDIA NIM",
@@ -40,7 +42,8 @@ enum class AiProvider(
     CUSTOM(
         displayName = "Custom Endpoint / Local Server",
         defaultBaseUrl = "http://10.0.2.2:8000/v1/chat/completions",
-        defaultModel = "local-model"
+        defaultModel = "local-model",
+        requiresApiKey = false
     )
 }
 
