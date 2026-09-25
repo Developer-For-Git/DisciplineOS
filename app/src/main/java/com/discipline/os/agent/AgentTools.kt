@@ -105,15 +105,15 @@ object AgentTools {
                 properties = JSONObject().apply {
                     put("personOrIncident", JSONObject().apply {
                         put("type", "string")
-                        put("description", "Who doubted you or what happened (e.g. 'The teacher who embarrassed me in class')")
+                        put("description", "Who doubted you or what happened (e.g. 'A skeptic who doubted my ability')")
                     })
                     put("defianceVow", JSONObject().apply {
                         put("type", "string")
-                        put("description", "Your fierce vow of defiance (e.g. 'I will be better than him. 1% every day.')")
+                        put("description", "Your fierce vow of defiance (e.g. 'The best revenge is massive compounding execution.')")
                     })
                     put("category", JSONObject().apply {
                         put("type", "string")
-                        put("description", "Category tag (e.g. 'Teacher', 'Doubter', 'Competition', 'Personal')")
+                        put("description", "Category tag (e.g. 'Critic', 'Skeptic', 'Competition', 'Personal')")
                     })
                 },
                 required = listOf("personOrIncident", "defianceVow")

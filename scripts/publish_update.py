@@ -9,10 +9,10 @@ import re
 # Ensure UTF-8 output on Windows
 sys.stdout.reconfigure(encoding='utf-8')
 
-PROJECT_DIR = os.path.abspath(r"C:\Users\LOL\Desktop\justC\DisciplineOS")
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 GRADLE_FILE = os.path.join(PROJECT_DIR, "app", "build.gradle.kts")
 APK_SOURCE = os.path.join(PROJECT_DIR, "app", "build", "outputs", "apk", "debug", "app-debug.apk")
-DESKTOP_DIR = os.path.abspath(r"C:\Users\LOL\Desktop")
+DESKTOP_DIR = os.path.expanduser("~/Desktop")
 APK_TARGET = os.path.join(DESKTOP_DIR, "DisciplineOS.apk")
 UPDATE_JSON = os.path.join(DESKTOP_DIR, "update.json")
 
@@ -28,7 +28,15 @@ def get_wifi_ip():
             return res
     except Exception:
         pass
-    return "10.137.177.187"
+    try:
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 def get_hotspot_gateway():
     """Get phone IP (gateway when connected to mobile hotspot)"""
@@ -150,7 +158,7 @@ def push_git_repo(name):
         print(f"⚠️ Git push notice: {e}")
 
 def publish_github_release(code, name, notes, apk_path):
-    token_path = r"C:\Users\LOL\.github_token"
+    token_path = os.path.expanduser("~/.github_token")
     if not os.path.exists(token_path):
         return
     with open(token_path, "r", encoding="utf-8") as f:

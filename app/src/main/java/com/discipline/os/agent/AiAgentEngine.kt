@@ -783,7 +783,7 @@ class AiAgentEngine(
                 lowerMsg.contains("vow") ||
                 lowerMsg.contains("doubter") ||
                 lowerMsg.contains("doubt") ||
-                lowerMsg.contains("teacher") ||
+                lowerMsg.contains("critic") ||
                 lowerMsg.contains("enemy") ||
                 lowerMsg.contains("mocked") ||
                 lowerMsg.contains("bullied") ||
@@ -793,8 +793,8 @@ class AiAgentEngine(
                     lowerMsg.startsWith("/fuel ") ||
                     lowerMsg.contains("add fuel") ||
                     lowerMsg.contains("log") ||
-                    lowerMsg.contains("teacher") ||
-                    lowerMsg.contains("tech") ||
+                    lowerMsg.contains("critic") ||
+                    lowerMsg.contains("skeptic") ||
                     lowerMsg.contains("doubt") ||
                     lowerMsg.contains("said") ||
                     lowerMsg.contains("trust") ||
@@ -815,7 +815,7 @@ class AiAgentEngine(
                     argumentsJson = JSONObject().apply {
                         put("personOrIncident", cleanedIncident.take(160))
                         put("defianceVow", "Keep working in relentless silence. The results will shatter their words.")
-                        put("category", if (lowerMsg.contains("teacher") || lowerMsg.contains("tech")) "Teacher" else "Doubter / Critic")
+                        put("category", if (lowerMsg.contains("critic") || lowerMsg.contains("skeptic")) "Critic" else "Doubter / Skeptic")
                     }.toString()
                 )
             } else {
@@ -1068,7 +1068,7 @@ class AiAgentEngine(
         // 10. Direct conversational coaching & analytical response
         val responseText = when {
             lowerMsg.contains("hello") || lowerMsg.contains("hi") || lowerMsg.contains("hey") -> {
-                "⚡ **${settings.modelName} Active** (${if (sizeMb > 0) "$sizeMb MB on-device" else "configured"}).\n\nReady to command. You can ask me to:\n• *'Add a task today 7:15 pm to do 10 pushups'*\n• *'Add to roadmap: Push pillar wall push-ups'*\n• *'In fuel section: my teacher doubted me'*\n• *'Delete the task you just added'*\n• *'Show today's routine'*\n• Or type `/` for slash command sections.\n\nWhat is our focus right now?"
+                "⚡ **${settings.modelName} Active** (${if (sizeMb > 0) "$sizeMb MB on-device" else "configured"}).\n\nReady to command. You can ask me to:\n• *'Add a task today 7:15 pm to do 10 pushups'*\n• *'Add to roadmap: Push pillar wall push-ups'*\n• *'In fuel section: someone doubted my vision'*\n• *'Delete the task you just added'*\n• *'Show today's routine'*\n• Or type `/` for slash command sections.\n\nWhat is our focus right now?"
             }
             lowerMsg.contains("motivat") || lowerMsg.contains("tired") || lowerMsg.contains("lazy") || lowerMsg.contains("give up") -> {
                 "⚡ **Discipline Over Motivation**\n\nMotivation is temporary and emotional. Discipline is an identity. When resistance appears, do not negotiate. Execute the very next scheduled protocol with strict adherence. Growth happens in the moments where you execute despite not wanting to."

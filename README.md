@@ -3,77 +3,112 @@
 <img src="docs/screenshots/app_icon.png" width="108" alt="DisciplineOS Icon" style="border-radius: 24px;" />
 
 # DisciplineOS
-### *The Relentless High-Performance Routine & Protocol Engine for Android*
+### *The Sovereign High-Performance Protocol Engine & On-Device AI Operating System*
 
 [![Android](https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20%26%20Material3-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Discipline AI](https://img.shields.io/badge/AI%20Agent-Autonomous%20%26%20On--Device-FF6D00?style=for-the-badge&logo=openai&logoColor=white)](#-discipline-ai-autonomous-agent)
-[![Room Database](https://img.shields.io/badge/Storage-Room%20SQLite-FFCA28?style=for-the-badge&logo=sqlite&logoColor=black)](https://developer.android.com/training/data-storage/room)
-[![OTA Updates](https://img.shields.io/badge/OTA-Wi--Fi%20Auto--Update%20Hub-FF5722?style=for-the-badge&logo=googleplay&logoColor=white)](#-in-app-wi-fi-auto-update-engine)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline%20%26%20Private-00C853?style=for-the-badge)](#-privacy--security)
+[![Discipline AI](https://img.shields.io/badge/AI%20Agent-Autonomous%20%26%20On--Device-FF6D00?style=for-the-badge&logo=openai&logoColor=white)](#-discipline-ai-autonomous-on-device-agent)
+[![Room Database](https://img.shields.io/badge/Storage-Room%20SQLite%20(Local%20Only)-FFCA28?style=for-the-badge&logo=sqlite&logoColor=black)](https://developer.android.com/training/data-storage/room)
+[![OTA Updates](https://img.shields.io/badge/OTA-Local%20Wi--Fi%20Firmware%20Sync-FF5722?style=for-the-badge&logo=googleplay&logoColor=white)](#-in-app-wi-fi-ota-auto-update-engine)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline%20%26%20Zero%20Telemetry-00C853?style=for-the-badge)](#-what-disciplineos-does-not-have)
 
 <br/>
 
-**DisciplineOS** is an unapologetic, luxury-grade routine execution system engineered for unyielding daily consistency. Combining an autonomous in-app AI agent with direct database execution tools, support for on-device tiny models (Google Gemma, Meta Llama) and cloud APIs, strict chronological timeline algorithms, an interactive digital clock studio, a YouTube educational vault, motivational fuel vows, and silent haptic vibration alerts, DisciplineOS is built for those who execute without excuses.
+**DisciplineOS** is an unapologetic, military-grade routine execution system and on-device AI assistant engineered for individuals who reject excuses and demand radical daily execution. It transforms your smartphone into a disciplined focus terminal—free from commercial bloat, subscription paywalls, and dopamine traps.
 
 </div>
 
 ---
 
-## 📱 Visual Showcase & Architecture
+## 🎯 Why We Made DisciplineOS (The Philosophy)
+
+Modern app stores are flooded with "habit trackers" that are engineered backwards:
+1. **Dopamine Traps disguised as productivity:** Gamified badges, cartoon animations, and social feeds keep users addicted to looking at the screen rather than doing the actual work.
+2. **Surveillance & Cloud Telemetry:** Commercial apps monetize your behavioral weaknesses, sell your activity patterns to data brokers, and force cloud accounts.
+3. **Passive Checklists with Zero Muscle:** Standard to-do apps sit silently in the background while you succumb to brain fog and distractions.
+4. **Subscription Extortion:** Charging \$10/month just to set recurring reminders or view 7-day analytics.
+
+**DisciplineOS was engineered with an opposite thesis:**
+* **Identity Over Motivation:** Motivation is fleeting and fickle. Discipline is systematic identity. DisciplineOS treats your day as an immutable flight checklist that you execute without negotiation.
+* **On-Device Data Sovereignty:** Your daily vows, private reflections, habit completion rates, and learning paths belong to you. Zero bytes leave your phone unless you intentionally ping an external LLM.
+* **Dopamine Shield Architecture:** Stark obsidian monochrome styling, zero colorful gamification badges, zero ads, zero short-form video feeds. Every pixel is crafted to calm the nervous system and protect your prefrontal cortex.
+* **Hardware-Level Enforcers:** High-potential rapid vibration haptics that break through sleep inertia and physical lethargy without sounding annoying alarms in public.
+
+---
+
+## 📱 Complete Visual Gallery & UI Showcase
+
+Every screen in DisciplineOS is handcrafted with Jetpack Compose, edge-to-edge system window insets, dynamic 3-button and gesture navigation clearance, and high-contrast OLED black themes:
 
 <div align="center">
 <table>
   <tr>
     <td align="center" width="33%">
-      <b>🌅 Chronological Protocols</b><br/><br/>
+      <b>🌅 01. Chronological Protocols</b><br/><br/>
       <img src="docs/screenshots/01_home_protocols.png" width="100%" alt="Protocols Screen" /><br/>
-      <i>Natural timeline with 5-tab stadium capsule dock, header AI launcher & 07:15 AM push-ups strictly prioritized before 07:30 AM coding.</i>
+      <i>Strict chronological timeline with capsule navigation dock, daily discipline score, and minute-precision execution sequencing.</i>
     </td>
     <td align="center" width="33%">
-      <b>🤖 Discipline AI Autonomous Agent</b><br/><br/>
+      <b>🤖 02. Discipline AI Autonomous Agent</b><br/><br/>
       <img src="docs/screenshots/07_discipline_ai_agent.png" width="100%" alt="Discipline AI Screen" /><br/>
-      <i>Full-screen dedicated AI workspace with direct app integration, quick action chips, top history/settings navigation & pure monochrome OLED styling.</i>
+      <i>Autonomous on-device AI with native function calling: mutates SQLite database, schedules alarms, and audits performance.</i>
     </td>
     <td align="center" width="33%">
-      <b>🧠 Tiny Mobile Models Catalog</b><br/><br/>
+      <b>🗺️ 03. Divided Multi-Track Roadmaps</b><br/><br/>
+      <img src="docs/screenshots/10_divided_roadmaps.png" width="100%" alt="Divided Roadmaps" /><br/>
+      <i>Categorized long-term progression tracks (Calisthenics Mastery, Systems Architecture) with milestone checklists.</i>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <b>🧠 04. Tiny Mobile Models Catalog</b><br/><br/>
       <img src="docs/screenshots/08_tiny_models_catalog.png" width="100%" alt="Tiny Models Catalog" /><br/>
-      <i>Run lightweight models locally on phone or Wi-Fi (Google Gemma 2 2B, Meta Llama 3.2 1B & 3B) via Ollama/GGUF with one-tap configuration.</i>
+      <i>Run Google Gemma 2 2B and Meta Llama 3.2 1B/3B directly on device storage with one-tap configuration.</i>
     </td>
-  </tr>
-  <tr>
     <td align="center" width="33%">
-      <b>⚙️ AI Models & Cloud APIs</b><br/><br/>
+      <b>⚙️ 05. AI Models & Cloud Gateway</b><br/><br/>
       <img src="docs/screenshots/08_ai_models_settings.png" width="100%" alt="AI Settings Dialog" /><br/>
-      <i>Multi-provider gateway: OpenRouter (free Gemini 2.0 Flash), OpenAI, Anthropic Claude, Ollama LAN, NVIDIA NIM & custom local endpoints.</i>
+      <i>Multi-provider gateway: OpenRouter (free Gemini 2.0 Flash), OpenAI, Anthropic Claude, Ollama LAN, and custom endpoints.</i>
     </td>
     <td align="center" width="33%">
-      <b>📊 Past Days & Progress Audit</b><br/><br/>
+      <b>📊 06. Past Days & Compounding Audit</b><br/><br/>
       <img src="docs/screenshots/09_past_days_progress.png" width="100%" alt="History Screen" /><br/>
-      <i>Permanent daily compounding discipline audit: historical scores, completed routines count & streak preservation.</i>
-    </td>
-    <td align="center" width="33%">
-      <b>⏰ Luxury Clock Studio</b><br/><br/>
-      <img src="docs/screenshots/02_luxury_clock_editor.png" width="100%" alt="Clock Editor" /><br/>
-      <i>Full-screen live digital clock with routine presets (5:27 AM, Bedtime), 12h/24h conversion & haptic toggle.</i>
+      <i>Permanent daily compounding discipline audit: historical execution scores, completed protocol logs, and streak tracking.</i>
     </td>
   </tr>
   <tr>
     <td align="center" width="33%">
-      <b>🎬 Video Knowledge Vault</b><br/><br/>
+      <b>⏰ 07. Luxury Clock Studio</b><br/><br/>
+      <img src="docs/screenshots/02_luxury_clock_editor.png" width="100%" alt="Clock Editor" /><br/>
+      <i>Edge-to-edge live digital clock with routine presets (05:27 AM, Bedtime), 12h/24h conversion, and haptic feedback.</i>
+    </td>
+    <td align="center" width="33%">
+      <b>🎬 08. Video Knowledge Vault</b><br/><br/>
       <img src="docs/screenshots/03_video_vault.png" width="100%" alt="Video Vault" /><br/>
-      <i>Save tutorials directly via Android Share Intent, schedule study reminders & track completed videos.</i>
+      <i>Curated video study engine: save tutorials via Android Share Intent, schedule study reminders, and track mastery.</i>
     </td>
     <td align="center" width="33%">
-      <b>🔥 Fuel & Defiance Mode</b><br/><br/>
+      <b>🔥 09. Fuel & Defiance Mode</b><br/><br/>
       <img src="docs/screenshots/04_fuel_quotes.png" width="100%" alt="Fuel Screen" /><br/>
-      <i>Convert past doubts, incidents, and setbacks into raw fuel and unshakeable daily vows.</i>
+      <i>The "Prove Them Wrong" vault: convert doubters, skeptics, and past setbacks into unrelenting compounding execution.</i>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%">
+      <b>📳 10. Rapid Vibration System</b><br/><br/>
+      <img src="docs/screenshots/05_vibration_system.png" width="100%" alt="Vibration System" /><br/>
+      <i>Silent, high-intensity haptic vibration pulses with diagnostic testing sweeps.</i>
     </td>
     <td align="center" width="33%">
-      <b>🚀 Wi-Fi In-App Auto-Update</b><br/><br/>
+      <b>🚀 11. Wi-Fi In-App Auto-Update</b><br/><br/>
       <img src="docs/screenshots/06_ota_update_popup.png" width="100%" alt="OTA Update Screen" /><br/>
-      <i>Instant over-the-air firmware updates: release notes, live download bar & one-tap Android installer.</i>
+      <i>Instant over-the-air firmware updates: release notes, live download bar, and one-tap Android installer.</i>
+    </td>
+    <td align="center" width="33%">
+      <b>🛡️ 12. Digital Dopamine Shield</b><br/><br/>
+      <img src="docs/screenshots/app_icon.png" width="100%" alt="Application Shield" /><br/>
+      <i>Built for deep work, mental toughness, and unrelenting focus on high-leverage goals.</i>
     </td>
   </tr>
 </table>
@@ -81,69 +116,112 @@
 
 ---
 
-## ✨ Key Features & Capabilities
+## ✨ What DisciplineOS Has (Complete Architecture)
 
-### 1. 🤖 Discipline AI Autonomous Agent & In-App Execution
-* **Direct Application Integration**: Unlike generic chat bots, Discipline AI has direct access to the app's internal Room SQLite database, AlarmScheduler, and vibration hardware via structured function calls.
-* **Top Model Switcher Bar**: Instantly swap between active and downloaded on-device models (e.g. Meta Llama 3.2 1B, Google Gemma 2 2B) directly from a horizontal switcher pinned to the top of the chat area.
-* **Autonomous Protocol Execution**:
-  * Query routines by date, priority, or time (`get_daily_protocols`).
-  * Mark protocols completed or toggle status instantly (`toggle_protocol_status`).
-  * Add or reschedule routines on the fly (`add_protocol`, `reschedule_protocol`).
-  * Add defiance quotes directly to your motivational fuel stash (`add_fuel_vow`).
-  * Trigger hardware vibration diagnostic sweeps (`test_vibration`).
-  * Audit past days' discipline scores and completion percentages (`get_past_history`).
-* **Clean Structured Markdown Responses**: Pure human-readable Markdown formatting without raw JSON code dumps, backed by realistic progressive on-device tensor evaluation pacing.
-* **Full-Screen Workspace**: When opened, the bottom dock automatically unmounts to provide maximum screen real estate. The top header features a back button to return to the dashboard, a direct shortcut to historical performance records, model settings, and chat reset.
-* **Monochrome Professional Aesthetic**: Stripped of distracting emoji clutter and inconsistent accent colors; follows DisciplineOS's strict dark slate OLED design language.
+### 1. 🤖 Discipline AI Autonomous On-Device Agent
+* **Native Structured Tool Calling:** The AI agent isn't a passive chatbot. It directly executes actions against the local Room SQLite database:
+  * `add_protocol`: Adds a new time-anchored protocol to the schedule.
+  * `toggle_protocol`: Toggles completion state with instant rapid vibration.
+  * `delete_protocol`: Safely deletes protocols with relative context awareness ("delete the task you just added").
+  * `add_fuel` & `delete_fuel`: Records or purges defiance vows from the Prove Them Wrong vault.
+  * `create_full_roadmap`: Synthesizes multi-step technical or fitness roadmaps with structured milestones.
+  * `delete_roadmap_step`: Removes milestones from active tracks.
+  * `get_daily_protocols` & `get_past_history`: Audits past discipline scores and schedules.
+* **Top Horizontal Model Switcher Bar:** Instantly hot-swap between active on-device GGUF models and cloud endpoints directly from the chat header.
+* **Smart Slash Commands (`/`):** Type `/` in the chat bar to trigger quick action suggestions for `/protocol`, `/roadmap`, `/fuel`, and `/history`.
+* **Universal General Knowledge:** Answers coding, systems architecture, fitness, and philosophy questions with direct, concise clarity.
 
-### 2. 🧠 On-Device Tiny Models & Multi-Provider LLM Gateway
-* **Local / On-Device Tiny Models Catalog**: Run offline without sending data to third parties. Automatically scans device storage and downloads directory for `.gguf` weights with 1-tap activation:
-  * **Google Gemma 2 2B Instruct** (1.6 GB, Q4_K_M): High precision, fast mobile inference.
-  * **Meta Llama 3.2 1B Instruct** (800 MB, Q4_K_M): Ultra-lightweight edge model.
-  * **Meta Llama 3.2 3B Instruct** (2.0 GB, Q4_K_M): Powerful on-device reasoning and schedule extraction.
-  * **Custom GGUF Downloader**: Direct download manager supporting custom HuggingFace or direct web links with progress bar and instant offline activation.
-* **Flexible Cloud Providers**:
-  * **OpenRouter** (Default: `google/gemini-2.0-flash-exp:free` for fast, zero-cost intelligence).
-  * **OpenAI** (`gpt-4o-mini`).
-  * **Anthropic Claude** (`claude-3-5-haiku-20241022`).
-  * **Ollama** (Local Wi-Fi PC server: `gemma2:2b` or custom models).
-  * **NVIDIA NIM** (`meta/llama-3.3-70b-instruct`).
-  * **Custom Endpoint** (Compatible with any OpenAI-compatible API or llama.cpp server).
+### 2. 🗺️ Divided Multi-Track Roadmaps (Long-Term Mastery)
+* **Track Division & Switcher:** Seamlessly switch between distinct progression domains (e.g. *Fitness: Your CALISTHENICS Journey* vs *Engineering: Low-Level Systems & Deep Work Architecture*).
+* **Granular Milestone Checklists:** Every roadmap phase contains concrete criteria and subtasks (e.g., Wall Push-ups -> Incline -> Negative Pull-ups -> Freestanding Handstand -> Clean Muscle-up).
+* **AI Roadmap Generator:** Tell Discipline AI *"design roadmap for Rust & WebAssembly"* and it autonomously builds the entire track into SQLite.
 
-### 3. 📊 Past Days & Compounding Progress Audit
-* **Compounding History Ledger**: Preserves daily completion scores, habits executed, and streaks at midnight or upon daily reset.
-* **Full-Screen Audit Modal**: Easily view historical discipline trends, average scores, and logged activity days. Accessible from both the Home dashboard and the Discipline AI top bar.
+### 3. 🌅 Strict Chronological Protocol Pipeline
+* **Natural Minute Sequencing:** Routines are strictly sorted chronologically (e.g., 07:15 AM Physical Readiness -> 07:30 AM Deep Work Coding -> 08:45 AM Core Technical Study).
+* **Dopamine Shield Category Filters:** Filter by `Health`, `Coding`, `Study`, `Engineering`, `Language`, `Security`, and `Bedtime`.
+* **One-Tap Subtask Progress:** Expand protocols to check off subtasks with real-time percentage updates.
 
-### 4. 🌅 Strict Chronological Protocol Pipeline
-* **Natural Time Sorting**: Automatically sequences morning, afternoon, college, evening, and bedtime routines by exact minute (e.g., 07:15 AM physical push-ups strictly prioritized before 07:30 AM deep coding).
-* **Smart Routine Presets**: Includes pre-configured college lectures & lab practice routines (08:45 AM), coding sprints, hydration intervals, and sleep protocols.
-* **Granular Subtask Checklists**: Break high-priority protocols into actionable subtasks with progress tracking.
-* **Auto-Reset Engine**: Automatically resets protocol completion states every midnight or on demand.
+### 4. ⏰ Luxury Digital Clock Studio
+* **Edge-to-Edge OLED Canvas:** Displays live system hours, minutes, and AM/PM with zero screen bleed.
+* **Instant Routine Chips:** Fast selection presets for early morning alarms (05:27 AM), workouts (07:15 AM), and bedtime wind-down (10:00 PM).
+* **System Navigation Inset Intelligence:** Fully responsive to both gesture bars and 3-button navigation overlays.
 
-### 5. ⏰ Interactive Luxury Clock Studio
-* **Edge-to-Edge Full-Screen Modal**: Built with zero background leakage and dynamic navigation insets that adapt flawlessly to both gesture and 3-button navigation.
-* **Live Digital Time Display**: Interactive glowing digital clock showing exact hours, minutes, and AM/PM indicators.
-* **One-Tap Quick Routine Chips**: Fast selection for custom morning alarms (05:27 AM), workout sessions (07:15 AM), and bedtime wind-downs (08:27 PM).
+### 5. 🎬 Video Knowledge Vault & Study Engine
+* **Android System Share Intent:** Share YouTube tutorial URLs directly into DisciplineOS from YouTube or web browsers.
+* **Scheduled Study Alarms:** Set rapid vibration reminders for study sessions ("Tonight 8:00 PM", "Tomorrow Morning").
+* **Curated Presets:** Pre-seeded with Calisthenics bodyweight mastery, low-level C programming, and security auditing foundations.
 
-### 6. 🎬 Video Knowledge Vault & Study Engine
-* **Android System Share Integration**: Share any video link directly from the YouTube app into DisciplineOS with automatic title extraction.
-* **Flexible Study Alarms**: Set instant study reminders ("In 1 Hour", "Tonight at 8 PM", "Tomorrow Morning", or custom date/time).
-* **Watched Archive**: Separate active study backlog from finished mastery videos.
+### 6. 🔥 Fuel & Defiance Mode ("Prove Them Wrong")
+* **Emotional Alchemy:** Convert skepticism, doubts from others, and personal frustrations into unyielding daily momentum.
+* **Defiance Cards:** Categorized by `Doubter`, `Critic`, `Skeptic`, `Rival`, and `Personal Vow`.
 
-### 7. 🔥 Fuel Quotes & Defiance Mode
-* **Emotional Anchoring**: Log incidents, doubts from others, and personal vows into distinct categories (`Defiance`, `Self-Discipline`, `Legacy`).
-* **Instant Fuel Card**: Randomly or sequentially view your strongest defiance vows whenever motivation dips.
+### 7. 📳 Silent Rapid Vibration Hardware Engine
+* **Tactile Wake-Up Pulses:** Uses Android `Vibrator` and `VibrationEffect` at maximum amplitude to signal task transitions silently.
+* **Built-in Diagnostic Sweep:** Test hardware haptics directly from System Settings.
 
-### 8. 📳 Silent Rapid Vibration Hardware Engine
-* **Maximum Hardware Potential**: Silent, high-intensity haptic vibration pulses designed to wake you up or signal habit transitions without noisy ringtones.
-* **Master Hardware Switch**: Dedicated toggle in System Settings with a live "Test Vibe" diagnostic button.
+### 8. 🚀 In-App Wi-Fi Auto-Update Engine (OTA Hub)
+* **Zero-Play-Store Private Updates:** Over-the-air firmware updates streamed directly over local Wi-Fi from your development PC.
+* **Native Package Installer:** Uses secure `FileProvider` URIs to trigger Android's native package installer with one tap.
 
-### 9. 🚀 In-App Wi-Fi Auto-Update Engine (OTA Update Hub)
-* **Automatic Launch Discovery**: When connected to local Wi-Fi, DisciplineOS pings the local manifest (`update.json` on port 8081).
-* **Luxury Update Dialog**: Displays current vs. remote version badges, categorized release notes, and download progress.
-* **One-Tap Installation**: Streams the APK over Wi-Fi, generates secure Android `FileProvider` URIs, and immediately triggers the native Android package installer.
-* **GitHub Releases Integration**: Automated publishing script compiles APK, updates OTA manifests, and uploads assets directly to GitHub Releases.
+---
+
+## 🚫 What DisciplineOS Does NOT Have
+
+| Feature | DisciplineOS | Commercial Habit Apps |
+| :--- | :---: | :---: |
+| **Advertisements** | ❌ **ZERO** | ⚠️ Fullscreen popups & banners |
+| **Cloud Tracking & Telemetry** | ❌ **ZERO** | ⚠️ Analytics, Firebase, Mixpanel |
+| **Subscription Paywalls** | ❌ **ZERO** | ⚠️ \$9.99/month or \$59/year |
+| **Mandatory Account Creation** | ❌ **ZERO** | ⚠️ Email, phone number, Google login |
+| **Social Doomscrolling Feeds** | ❌ **ZERO** | ⚠️ Community forums, likes, feeds |
+| **Gamified Cartoon Clutter** | ❌ **ZERO** | ⚠️ Pet avatars, candy animations |
+| **Data Selling to Brokers** | ❌ **ZERO** | ⚠️ Monitored behavior profiles |
+
+---
+
+## 📖 How To Use DisciplineOS
+
+### 1. Daily Protocol Flow
+1. Open DisciplineOS in the morning.
+2. Review your chronological flight checklist:
+   * **07:15 AM:** Morning Physical Readiness & Mobility
+   * **07:30 AM:** Deep Work: Systems & Architecture (1 Hour)
+   * **08:45 AM:** Core Technical Deep Study & Lab Practice
+   * **05:27 PM:** Engineering Review & Project Implementation
+   * **06:30 PM:** Cognitive Expansion & Language Acquisition
+   * **08:27 PM:** Cyber Security & Systems Auditing
+   * **10:00 PM:** Compounding Daily Reflection (1% Better)
+   * **All Day:** Digital Dopamine Shield (Focus Lock)
+3. Tap the circle on any completed protocol to trigger the high-intensity completion haptic.
+
+### 2. Using Discipline AI (Voice & Text)
+* Tap the ✨ Sparkles tab in the bottom dock.
+* **Add a routine:** *"Add a task today at 4:30 pm to run 5 kilometers"*
+* **Mark complete:** *"Mark morning physical readiness done"*
+* **Delete relative:** *"Delete the task you just created"*
+* **Build a roadmap:** *"Design roadmap for bare-metal assembly programming"*
+* **Log fuel:** *"In fuel section: a critic told me I'd never master low-level systems"*
+* **Delete fuel:** *"/fuel delete critic"*
+* **Ask general questions:** *"Explain the difference between stack and heap in C"*
+
+### 3. Setting Up On-Device Tiny Models
+1. Tap the ⚙️ Settings gear in the AI chat header.
+2. Download any lightweight `.gguf` model (e.g. Google Gemma 2 2B or Meta Llama 3.2 1B).
+3. Place it in your phone's `Downloads` folder or use the in-app Model Downloader.
+4. Select the model from the **Top Switcher Bar** for 100% offline, zero-latency inference.
+
+### 4. Over-The-Air (OTA) Wi-Fi Firmware Updates
+To update your phone without connecting a USB cable:
+```bash
+# 1. On your PC, build and publish a new version
+python scripts/publish_update.py --bump patch --release-notes "Added new roadmap track & haptic improvements"
+
+# 2. Start the local OTA Wi-Fi server
+python -m http.server 8081 --directory ~/Desktop
+
+# 3. Open DisciplineOS on your phone (connected to same Wi-Fi)
+# An instant "Update Available" modal will appear with one-tap installation!
+```
 
 ---
 
@@ -151,45 +229,48 @@
 
 ```mermaid
 flowchart TD
-    UI[Jetpack Compose UI & Material 3] --> VM[State / Coroutine Flow]
-    VM --> AI[Discipline AI Engine]
-    AI --> TOOLS[Native App Execution Tools]
-    TOOLS --> DB[(Room SQLite Database)]
-    TOOLS --> ALARM[Android AlarmManager & Haptics]
-    AI --> LLM[LLM Gateway: OpenRouter / Ollama / Tiny Models / Claude / OpenAI]
+    UI["Jetpack Compose UI (Monochrome OLED)"] --> VM["State & Coroutine Flows"]
+    VM --> AI["Discipline AI Engine"]
+    AI --> TOOLS["Native App Execution Tools"]
+    TOOLS --> DB[("Room SQLite Database (Local Only)")]
+    TOOLS --> ALARM["Android AlarmManager & Haptics"]
+    AI --> GATEWAY["LLM Gateway"]
+    GATEWAY --> LOCAL["On-Device GGUF (Gemma 2 / Llama 3.2)"]
+    GATEWAY --> OLLAMA["Local PC Ollama (:11434)"]
+    GATEWAY --> CLOUD["OpenRouter / Anthropic / OpenAI"]
     VM --> DB
     VM --> ALARM
-    VM --> OTA[Wi-Fi OTA Update Manager]
-    OTA --> SERVER[Local Wi-Fi Server :8081]
-    VM --> REST[Local REST Sync Server :8080]
+    VM --> OTA["Wi-Fi OTA Update Engine (:8081)"]
+    VM --> REST["Local REST Sync Bridge (:8080)"]
 ```
 
-* **Language**: 100% Kotlin 2.0
-* **UI Framework**: Jetpack Compose & Material 3 (Custom Obsidian / Monochrome Dark & Light Design System)
-* **Autonomous AI**: Custom Kotlin Agent Engine with Tool Calling & Multi-Provider JSON Streaming
-* **Database**: Room SQLite with automatic migration and deduplication algorithms
-* **Asynchrony**: Kotlin Coroutines & StateFlow
-* **Package Management & Updates**: Native Android `FileProvider` + `REQUEST_INSTALL_PACKAGES`
-* **Network Traffic**: Local HTTP Cleartext enabled for zero-friction private Wi-Fi synchronization
+* **OS Platform:** Android 8.0+ (API 26 to API 35+)
+* **Programming Language:** 100% Kotlin 2.0
+* **UI Framework:** Jetpack Compose & Material 3 (Obsidian Dark / Crisp Light Design System)
+* **Local Database:** Room SQLite with automatic schema migration and deduplication
+* **Asynchronous Engine:** Kotlin Coroutines & StateFlow
+* **Haptics:** Android Hardware Vibrator API with custom waveform effects
+* **OTA Delivery:** Custom HTTP Cleartext client with Android `FileProvider` package installer integration
 
 ---
 
-## 📥 Building & Installing
+## 📥 Building From Source
 
 ### Prerequisites
-* Android Studio Ladybug / Koala or Android SDK Platform-Tools 35+
+* Android Studio Ladybug / Koala or Android SDK Command-Line Tools
 * JDK 21+
+* Android device or emulator running Android 8.0+ (API 26+)
 
-### Build Debug APK
+### Build APK
 ```bash
 # Clone the repository
 git clone https://github.com/Developer-For-Git/DisciplineOS.git
 cd DisciplineOS
 
-# Compile and assemble APK
+# Compile and package debug APK
 ./gradlew assembleDebug
 ```
-The compiled APK will be located at:
+The compiled APK will be at:
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -201,15 +282,21 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-## 🔒 Privacy & Security
+## 🔮 Future Roadmap
 
-* **100% Offline-First Core**: All your protocols, video notes, and fuel quotes reside strictly in local SQLite storage on your physical device.
-* **Local AI Privacy**: Use Tiny Mobile Models (Google Gemma 2, Meta Llama 3.2) or local Ollama servers over Wi-Fi for completely offline and private AI assistance.
-* **Zero Telemetry**: No third-party analytics, tracking SDKs, or cloud telemetry.
-* **Private Wi-Fi Only**: Over-the-air updates communicate only with your specified local PC server address on your trusted home Wi-Fi network.
+- [ ] **WearOS Companion Module:** Silent wrist haptics and protocol checklists synced with the mobile terminal.
+- [ ] **Camera AI Posture & Form Analyzer:** Local on-device vision model verifying clean push-up and pull-up depth.
+- [ ] **Encrypted P2P Backup:** Offline mesh synchronization between personal laptop and smartphone over local Wi-Fi.
+- [ ] **Hardware NFC Discipline Tags:** Tap a physical NFC tag on your desk or pull-up bar to mark protocols complete.
+
+---
+
+## 🔒 Privacy Guarantee
+
+DisciplineOS contains **zero proprietary analytics**, **zero trackers**, and **zero user telemetry**. Your routines, defiance vows, and personal history are stored solely in local SQLite databases on your physical hardware. You own your data, your focus, and your daily execution.
 
 ---
 
 <div align="center">
-  <sub>Built with relentless discipline by <b>Developer-For-Git</b></sub>
+  <sub>Engineered for uncompromising high performance by <b>Developer-For-Git</b></sub>
 </div>

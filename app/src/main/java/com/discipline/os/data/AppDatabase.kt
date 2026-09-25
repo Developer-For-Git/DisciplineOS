@@ -176,83 +176,83 @@ abstract class AppDatabase : RoomDatabase() {
 
             val defaults = listOf(
                 Task(
-                    title = "Do 10 push-ups (Strength & energy)",
-                    description = "Build physical strength and mental alertness first thing in the morning.",
+                    title = "Morning Physical Readiness & Mobility",
+                    description = "Build physical strength, posture, and mental alertness first thing in the morning.",
                     category = "Health",
                     priority = 1,
                     scheduledTime = "07:15",
                     ringSound = false,
-                    subtasksJson = """[{"text":"10 clean-form push-ups","done":false}]""",
+                    subtasksJson = """[{"text":"10 clean-form push-ups","done":false},{"text":"Full-body mobility stretch","done":false}]""",
                     sortOrder = 1
                 ),
                 Task(
-                    title = "Coding for 1 hour / Code with Harry",
-                    description = "Daily technical growth. Never passively watch tutorials; always compile and debug code yourself in GCC.",
+                    title = "Deep Work: Systems & Architecture (1 Hour)",
+                    description = "Daily technical growth. Never passively watch tutorials; always compile, benchmark, and debug code independently.",
                     category = "Coding",
                     priority = 1,
                     scheduledTime = "07:30",
                     ringSound = false,
-                    subtasksJson = """[{"text":"Watch 1 lesson / chapter","done":false},{"text":"Type and compile code in VS Code","done":false},{"text":"Debug errors independently","done":false}]""",
+                    subtasksJson = """[{"text":"Read 1 technical chapter or module","done":false},{"text":"Write, compile, and benchmark code","done":false},{"text":"Debug and inspect memory independently","done":false}]""",
                     sortOrder = 2
                 ),
                 Task(
-                    title = "Attend College Lectures & Lab Practice",
-                    description = "Diploma CSE core attendance: Data Structures, Algorithms, and Operating Systems. Zero backlogs.",
-                    category = "College",
+                    title = "Core Technical Deep Study & Lab Practice",
+                    description = "Core computer science fundamentals: Data Structures, Algorithms, and Operating Systems architecture.",
+                    category = "Study",
                     priority = 1,
                     scheduledTime = "08:45",
                     ringSound = false,
-                    subtasksJson = """[{"text":"Attend core morning lectures","done":false},{"text":"Hands-on programming lab practice","done":false}]""",
+                    subtasksJson = """[{"text":"Master core architecture concepts","done":false},{"text":"Hands-on implementation & lab practice","done":false}]""",
                     sortOrder = 3
                 ),
                 Task(
-                    title = "College homework & subject catch-up",
-                    description = "Stay ahead in Diploma CSE subjects (Data Structures, Algorithms, COA). Zero backlog.",
-                    category = "College",
+                    title = "Engineering Review & Project Implementation",
+                    description = "Stay ahead in core engineering subjects and systems architecture. Review daily progress and eliminate bottlenecks.",
+                    category = "Engineering",
                     priority = 1,
                     scheduledTime = "17:27",
                     ringSound = false,
-                    subtasksJson = """[{"text":"Review today's lecture notes","done":false},{"text":"Complete pending lab/homework","done":false}]""",
+                    subtasksJson = """[{"text":"Review today's architecture notes","done":false},{"text":"Complete pending implementations and challenges","done":false}]""",
                     sortOrder = 4
                 ),
                 Task(
-                    title = "Learn Mandarin (Vocab & Pinyin)",
-                    description = "Language acquisition for competitive edge. 15-20 mins Pinyin, Hanzi flashcards, and tones.",
+                    title = "Cognitive Expansion & Language Acquisition",
+                    description = "Language acquisition and memory training for neuroplasticity. 15-20 mins daily practice.",
                     category = "Language",
                     priority = 2,
                     scheduledTime = "18:30",
                     ringSound = false,
-                    subtasksJson = """[{"text":"10 new Hanzi flashcards","done":false},{"text":"Practice 4 tones aloud","done":false}]""",
+                    subtasksJson = """[{"text":"10 new vocabulary flashcards","done":false},{"text":"Practice pronunciation & speech aloud","done":false}]""",
                     sortOrder = 5
                 ),
                 Task(
-                    title = "Cyber Security (TryHackMe / Practice)",
-                    description = "Hands-on offensive/defensive security labs and CTF fundamentals.",
+                    title = "Cyber Security & Systems Auditing",
+                    description = "Hands-on security audits, network protocols, and defensive security fundamentals.",
                     category = "Security",
                     priority = 2,
                     scheduledTime = "20:27",
                     ringSound = false,
-                    subtasksJson = """[{"text":"Complete 1 TryHackMe room","done":false},{"text":"Document findings in notes","done":false}]""",
+                    subtasksJson = """[{"text":"Complete 1 security lab room","done":false},{"text":"Document security analysis & findings","done":false}]""",
                     sortOrder = 6
                 ),
                 Task(
-                    title = "Be better than yesterday (1% improvement)",
-                    description = "Daily evening reflection. Audit what went well, what slipped, and commit to tomorrow.",
+                    title = "Compounding Daily Reflection (1% Better)",
+                    description = "Daily evening audit. Review what succeeded, eliminate friction, and set tomorrow's targets.",
                     category = "Bedtime",
                     priority = 1,
                     scheduledTime = "22:00",
                     ringSound = false,
-                    subtasksJson = """[{"text":"Audit today's completions","done":false},{"text":"Beat yesterday's version of self","done":false}]""",
+                    subtasksJson = """[{"text":"Audit today's completions & execution","done":false},{"text":"Beat yesterday's version of self","done":false}]""",
                     sortOrder = 7
                 ),
                 Task(
-                    title = "Zero porn & addictive shorts (Focus shield)",
-                    description = "Dopamine receptor protection. No short-form doomscrolling, no adult content. Pure deep focus.",
+                    title = "Digital Dopamine Shield (Focus Lock)",
+                    description = "Dopamine receptor protection. No short-form doomscrolling, zero digital distractions. Pure deep focus.",
                     category = "Discipline",
                     priority = 1,
                     scheduledTime = "",
                     ringSound = false,
-                    subtasksJson = """[{"text":"Zero short-form scrolling (Reels/Shorts)","done":false},{"text":"Zero adult content","done":false}]""",
+                    subtasksJson = """[{"text":"Zero short-form scrolling (Reels/Shorts)","done":false},{"text":"Zero low-dopamine traps & adult content","done":false}]""",
                     sortOrder = 8
                 )
             )
@@ -264,24 +264,35 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
             // Step 3: Update existing tasks to ensure chronological times and order are strictly synced
+            // and sanitize any prior personal descriptions
             val allCurrentTasks = taskDao.getAllTasksSync()
             for (task in allCurrentTasks) {
                 val titleLower = task.title.lowercase()
                 var updated = task
-                if (titleLower.contains("push-up") && (task.scheduledTime != "07:15" || task.sortOrder != 1)) {
+                if ((titleLower.contains("push-up") || titleLower.contains("readiness")) && (task.scheduledTime != "07:15" || task.sortOrder != 1)) {
                     updated = updated.copy(scheduledTime = "07:15", sortOrder = 1)
-                } else if (titleLower.contains("coding") && (task.scheduledTime != "07:30" || task.sortOrder != 2)) {
+                } else if ((titleLower.contains("coding") || titleLower.contains("deep work")) && (task.scheduledTime != "07:30" || task.sortOrder != 2)) {
                     updated = updated.copy(scheduledTime = "07:30", sortOrder = 2)
-                } else if (titleLower.contains("college lecture") && (task.scheduledTime != "08:45" || task.sortOrder != 3)) {
+                } else if ((titleLower.contains("lecture") || titleLower.contains("deep study")) && (task.scheduledTime != "08:45" || task.sortOrder != 3)) {
                     updated = updated.copy(scheduledTime = "08:45", sortOrder = 3)
-                } else if (titleLower.contains("college homework") && (task.scheduledTime != "17:27" || task.sortOrder != 4)) {
+                } else if ((titleLower.contains("homework") || titleLower.contains("engineering review")) && (task.scheduledTime != "17:27" || task.sortOrder != 4)) {
                     updated = updated.copy(scheduledTime = "17:27", sortOrder = 4)
-                } else if (titleLower.contains("mandarin") && (task.scheduledTime != "18:30" || task.sortOrder != 5)) {
+                } else if ((titleLower.contains("mandarin") || titleLower.contains("cognitive expansion")) && (task.scheduledTime != "18:30" || task.sortOrder != 5)) {
                     updated = updated.copy(scheduledTime = "18:30", sortOrder = 5)
-                } else if (titleLower.contains("cyber security") && (task.scheduledTime != "20:27" || task.sortOrder != 6)) {
+                } else if (titleLower.contains("security") && (task.scheduledTime != "20:27" || task.sortOrder != 6)) {
                     updated = updated.copy(scheduledTime = "20:27", sortOrder = 6)
-                } else if ((titleLower.contains("better than yesterday") || task.category.equals("bedtime", true)) && (task.scheduledTime != "22:00" || task.sortOrder != 7)) {
+                } else if ((titleLower.contains("better than yesterday") || titleLower.contains("reflection") || task.category.equals("bedtime", true)) && (task.scheduledTime != "22:00" || task.sortOrder != 7)) {
                     updated = updated.copy(scheduledTime = "22:00", sortOrder = 7)
+                }
+                // Sanitize any existing personal student descriptions
+                if (updated.description.contains("Diploma CSE", ignoreCase = true) || updated.title.contains("Code with Harry", ignoreCase = true)) {
+                    if (updated.title.contains("Code with Harry", ignoreCase = true)) {
+                        updated = updated.copy(title = "Deep Work: Systems & Architecture (1 Hour)", description = "Daily technical growth. Never passively watch tutorials; always compile, benchmark, and debug code independently.")
+                    } else if (updated.title.contains("lecture", ignoreCase = true)) {
+                        updated = updated.copy(title = "Core Technical Deep Study & Lab Practice", description = "Core computer science fundamentals: Data Structures, Algorithms, and Operating Systems architecture.")
+                    } else if (updated.title.contains("homework", ignoreCase = true)) {
+                        updated = updated.copy(title = "Engineering Review & Project Implementation", description = "Stay ahead in core engineering subjects and systems architecture. Review daily progress and eliminate bottlenecks.")
+                    }
                 }
                 if (updated != task) {
                     taskDao.updateTask(updated)
@@ -290,15 +301,27 @@ abstract class AppDatabase : RoomDatabase() {
 
             // Fuel default seeding (only if not already present)
             val existingFuel = fuelDao.getAllFuelSync().map { it.personOrIncident.trim().lowercase() }.toSet()
-            val defaultPerson = "The teacher who embarrassed me in class"
+            val defaultPerson = "Naysayers & Skeptics"
             if (defaultPerson.trim().lowercase() !in existingFuel) {
                 fuelDao.insertFuel(
                     FuelEntry(
                         personOrIncident = defaultPerson,
-                        defianceVow = "I will be better than him. 1% every single day until my results speak for themselves.",
-                        category = "Teacher"
+                        defianceVow = "The best revenge is massive compounding success. Let unrelenting daily execution do all the talking.",
+                        category = "Defiance"
                     )
                 )
+            }
+
+            // Sanitize any prior personal fuel entries from the database
+            val allFuel = fuelDao.getAllFuelSync()
+            for (f in allFuel) {
+                if (f.personOrIncident.contains("teacher", ignoreCase = true) || f.personOrIncident.contains("embarrassed", ignoreCase = true)) {
+                    fuelDao.updateFuel(f.copy(
+                        personOrIncident = "Naysayers & Skeptics",
+                        defianceVow = "The best revenge is massive compounding success. Let unrelenting daily execution do all the talking.",
+                        category = "Defiance"
+                    ))
+                }
             }
 
             // Video default seeding (only if not already present)
@@ -313,20 +336,20 @@ abstract class AppDatabase : RoomDatabase() {
                     notes = "Zero equipment, 4 fundamental pillars (Push, Pull, Legs, Core), progressive overload ladder, and 30-day foundation blueprint."
                 ),
                 VideoEntry(
-                    title = "C Language Full Tutorial For Beginners - CodeWithHarry",
+                    title = "C Programming & Low-Level Systems Foundations",
                     url = "https://youtu.be/irqbmMNs2Bo",
                     category = "Coding",
                     reminderType = "RAPID_VIBRATE",
                     reminderDelayText = "Tomorrow 07:30",
-                    notes = "Crucial pointer and memory management lectures. Code along in GCC."
+                    notes = "Crucial pointer arithmetic, struct alignment, and manual memory management. Code along in GCC."
                 ),
                 VideoEntry(
-                    title = "TryHackMe Complete Beginner Walkthrough & CTF Basics",
+                    title = "Network Security Fundamentals & Systems Auditing",
                     url = "https://youtu.be/2NX09qFm01M",
                     category = "Security",
                     reminderType = "RAPID_VIBRATE",
                     reminderDelayText = "Tonight 20:27",
-                    notes = "Core networking, Linux terminal commands, and basic privilege escalation."
+                    notes = "Core networking protocols, Linux terminal commands, and defensive security auditing."
                 )
             )
             val videosToInsert = defaultVideos.filter { it.url.trim().lowercase() !in existingVideos }
@@ -334,15 +357,22 @@ abstract class AppDatabase : RoomDatabase() {
                 videoDao.insertVideos(videosToInsert)
             }
 
-            // Auto-normalize any existing videos to correct routine schedule
+            // Auto-normalize any existing videos to correct routine schedule and sanitize titles
             val allVideos = videoDao.getAllVideosSync()
             for (v in allVideos) {
                 var updated = v
                 val titleLower = v.title.lowercase()
-                if (titleLower.contains("c language") && (v.reminderDelayText.contains("20:00") || v.reminderDelayText.isBlank())) {
-                    updated = updated.copy(reminderDelayText = "Tomorrow 07:30")
-                } else if (titleLower.contains("tryhackme") && (v.reminderDelayText.contains("07:30") || v.reminderDelayText.isBlank())) {
-                    updated = updated.copy(reminderDelayText = "Tonight 20:27")
+                if (titleLower.contains("c language") || titleLower.contains("codewithharry") || titleLower.contains("c programming")) {
+                    if (v.reminderDelayText.contains("20:00") || v.reminderDelayText.isBlank()) {
+                        updated = updated.copy(reminderDelayText = "Tomorrow 07:30")
+                    }
+                    if (v.title.contains("CodeWithHarry", ignoreCase = true)) {
+                        updated = updated.copy(title = "C Programming & Low-Level Systems Foundations")
+                    }
+                } else if (titleLower.contains("tryhackme") || titleLower.contains("network security")) {
+                    if (v.reminderDelayText.contains("07:30") || v.reminderDelayText.isBlank()) {
+                        updated = updated.copy(reminderDelayText = "Tonight 20:27")
+                    }
                 } else if (titleLower.contains("calisthenics") && v.reminderDelayText.isBlank()) {
                     updated = updated.copy(reminderDelayText = "Morning 07:15")
                 }

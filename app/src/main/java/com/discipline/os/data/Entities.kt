@@ -24,7 +24,7 @@ data class FuelEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val personOrIncident: String,
     val defianceVow: String,
-    val category: String = "Doubter", // "Doubter", "Teacher", "Obstacle", "Goal"
+    val category: String = "Doubter", // "Doubter", "Critic", "Skeptic", "Obstacle", "Goal"
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -42,7 +42,7 @@ data class VideoEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val url: String,
-    val category: String = "Coding", // "Coding", "Security", "Mandarin", "College", "Mindset", "Other"
+    val category: String = "Coding", // "Coding", "Systems", "Security", "Language", "Mindset", "Other"
     val reminderEpochMs: Long = 0L, // 0 = no reminder scheduled
     val reminderType: String = "RAPID_VIBRATE", // "RAPID_VIBRATE", "ALARM_SOUND", "NOTIFICATION"
     val reminderDelayText: String = "", // e.g. "In 1 hour", "Tonight 8:00 PM"

@@ -17,7 +17,7 @@ import java.net.URL
 
 object UpdateManager {
 
-    const val DEFAULT_UPDATE_SERVER = "http://10.137.177.187:8081"
+    const val DEFAULT_UPDATE_SERVER = "http://10.0.2.2:8081"
     private const val PREFS_NAME = "discipline_prefs"
     private const val KEY_UPDATE_SERVER = "update_server_url"
     private const val KEY_OFFLINE_UPDATE_CODE = "offline_update_version_code"
@@ -129,8 +129,8 @@ object UpdateManager {
             candidateUrls.add("$baseUrl/update.json")
         }
 
-        // Add 10.0.2.2 fallback for emulator compatibility
-        if (candidateUrls.firstOrNull()?.contains("10.137.177.187") == true) {
+        // Add 10.0.2.2 fallback for emulator compatibility if testing remote LAN
+        if (!candidateUrls.any { it.contains("10.0.2.2") }) {
             candidateUrls.add("http://10.0.2.2:8081/update.json")
         }
 
@@ -161,8 +161,15 @@ object UpdateManager {
                     if (apkUrl.isBlank() || apkUrl.startsWith("/")) {
                         val base = manifestUrl.substringBeforeLast('/')
                         apkUrl = "$base/DisciplineOS.apk"
-                    } else if (manifestUrl.contains("10.0.2.2") && apkUrl.contains("10.137.177.187")) {
-                        apkUrl = apkUrl.replace("10.137.177.187", "10.0.2.2")
+                    } else if (manifestUrl.contains("10.0.2.2")) {
+                        // In emulator context, redirect host if remote IP was given
+                        try {
+                            val parsedUri = Uri.parse(apkUrl)
+                            val host = parsedUri.host
+                            if (host != null && host != "10.0.2.2" && !host.startsWith("127.")) {
+                                apkUrl = apkUrl.replace(host, "10.0.2.2")
+                            }
+                        } catch (_: Exception) {}
                     }
 
                     val notesList = mutableListOf<String>()

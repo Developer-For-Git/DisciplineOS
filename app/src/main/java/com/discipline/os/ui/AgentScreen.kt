@@ -525,7 +525,7 @@ fun AgentScreen(
                     .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                listOf("Teacher", "Critic", "Doubter", "Classmate", "Personal Vow").forEach { chip ->
+                listOf("Critic", "Skeptic", "Rival", "Doubter", "Personal Vow").forEach { chip ->
                     Surface(
                         shape = CircleShape,
                         color = colors.cardElevated,

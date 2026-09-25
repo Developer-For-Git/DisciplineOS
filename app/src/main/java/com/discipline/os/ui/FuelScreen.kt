@@ -134,7 +134,7 @@ fun FuelScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Remember everyone who doubted, mocked, or embarrassed you. Convert every insult into relentless compounding execution until your results speak for themselves.",
+                        text = "Remember everyone who doubted, dismissed, or underestimated you. Convert every doubt into relentless compounding execution until your results speak for themselves.",
                         color = TextSecondary,
                         fontSize = 13.sp,
                         lineHeight = 18.sp
@@ -286,8 +286,8 @@ fun ModernAddFuelDialog(
                 OutlinedTextField(
                     value = person,
                     onValueChange = { person = it },
-                    label = { Text("Doubter / Incident / Teacher") },
-                    placeholder = { Text("e.g. Teacher who embarrassed me in class") },
+                    label = { Text("Doubter / Skeptic / Incident") },
+                    placeholder = { Text("e.g. Skeptic who doubted my technical ability") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -306,7 +306,7 @@ fun ModernAddFuelDialog(
                     value = vow,
                     onValueChange = { vow = it },
                     label = { Text("What they said & Your Vow") },
-                    placeholder = { Text("e.g. Said I'd fail. I will be better than him.") },
+                    placeholder = { Text("e.g. Doubted my focus. The results will speak for themselves.") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
