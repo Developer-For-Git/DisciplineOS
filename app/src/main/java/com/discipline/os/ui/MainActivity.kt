@@ -172,9 +172,18 @@ class MainActivity : ComponentActivity() {
                         .background(CanvasBg)
                         .statusBarsPadding()
                 ) {
-                    // Screen Content Area
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        when (selectedTab) {
+                    if (showHistoryDialog) {
+                        androidx.activity.compose.BackHandler {
+                            showHistoryDialog = false
+                        }
+                        HistoryScreen(
+                            dailyLogs = dailyLogs,
+                            onDismiss = { showHistoryDialog = false }
+                        )
+                    } else {
+                        // Screen Content Area
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            when (selectedTab) {
                             0 -> DisciplineScreen(
                                 tasks = tasks,
                                 isDarkMode = isDarkMode,
@@ -359,22 +368,15 @@ class MainActivity : ComponentActivity() {
                             .navigationBarsPadding()
                             .padding(bottom = 16.dp)
                     )
+                }
 
-                    // OTA Update Pop-up Dialog
-                    if (showUpdateDialog && pendingUpdateInfo != null) {
-                        UpdateDialog(
-                            updateInfo = pendingUpdateInfo!!,
-                            onDismiss = { showUpdateDialog = false }
-                        )
-                    }
-
-                    // Past Days History Pop-up Dialog
-                    if (showHistoryDialog) {
-                        HistoryDialog(
-                            dailyLogs = dailyLogs,
-                            onDismiss = { showHistoryDialog = false }
-                        )
-                    }
+                // OTA Update Pop-up Dialog
+                if (showUpdateDialog && pendingUpdateInfo != null) {
+                    UpdateDialog(
+                        updateInfo = pendingUpdateInfo!!,
+                        onDismiss = { showUpdateDialog = false }
+                    )
+                }
                 }
             }
         }
