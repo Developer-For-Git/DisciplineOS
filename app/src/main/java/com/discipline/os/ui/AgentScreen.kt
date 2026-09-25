@@ -59,6 +59,7 @@ fun AgentScreen(
     val downloadStatus by ModelDownloadManager.downloadStatus.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
+    var showSlashMenu by remember { mutableStateOf(false) }
     var isConfiguringModel by remember { mutableStateOf(false) }
     var currentSettings by remember { mutableStateOf(AiSettings.load(context)) }
 
@@ -428,6 +429,156 @@ fun AgentScreen(
             }
         }
 
+        // Slash Commands Floating Menu (Triggered by '/' or the command button)
+        AnimatedVisibility(
+            visible = showSlashMenu || (inputText.startsWith("/") && inputText.length <= 4),
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            SlashCommandMenu(
+                onSelectCommand = { cmd ->
+                    inputText = cmd
+                    showSlashMenu = false
+                },
+                onDirectExecute = { directMsg ->
+                    showSlashMenu = false
+                    inputText = ""
+                    coroutineScope.launch {
+                        engine.sendMessage(directMsg)
+                    }
+                },
+                onDismiss = { showSlashMenu = false },
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
+        // Contextual Section Pills Bar (Appears when user starts typing /roadmap, /protocol, /fuel, /delete)
+        if (inputText.startsWith("/roadmap")) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("Push", "Pull", "Legs", "Core", "Skills", "Wall Push-ups", "Pull-ups", "L-sit").forEach { chip ->
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.cardElevated,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderSubtle),
+                        modifier = Modifier.clickable {
+                            inputText = if (chip in listOf("Push", "Pull", "Legs", "Core", "Skills")) {
+                                "/roadmap $chip: "
+                            } else {
+                                "/roadmap $chip "
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = chip,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
+        } else if (inputText.startsWith("/protocol") || inputText.startsWith("/task")) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("Health", "Coding", "College", "Bedtime", "7:15 PM", "Morning", "10 Push-ups").forEach { chip ->
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.cardElevated,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderSubtle),
+                        modifier = Modifier.clickable {
+                            inputText = if (chip.contains("PM") || chip == "Morning") {
+                                if (inputText.endsWith(" ")) "${inputText}at $chip " else "$inputText at $chip "
+                            } else if (chip.contains("Push-ups")) {
+                                "/protocol $chip at 7:15 PM"
+                            } else {
+                                if (inputText.endsWith(" ")) "$inputText$chip: " else "$inputText $chip: "
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = chip,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
+        } else if (inputText.startsWith("/fuel")) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf("Teacher", "Critic", "Doubter", "Classmate", "Personal Vow").forEach { chip ->
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.cardElevated,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.borderSubtle),
+                        modifier = Modifier.clickable {
+                            inputText = "/fuel $chip: "
+                        }
+                    ) {
+                        Text(
+                            text = chip,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
+        } else if (inputText.startsWith("/delete")) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
+                    modifier = Modifier.clickable {
+                        coroutineScope.launch {
+                            engine.sendMessage("delete the task you just added")
+                        }
+                        inputText = ""
+                    }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Tap to Delete Last Added Task",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFEF4444)
+                        )
+                    }
+                }
+            }
+        }
+
         // Bottom Input Row
         Row(
             modifier = Modifier
@@ -438,12 +589,36 @@ fun AgentScreen(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Slash Command Trigger Button
+            IconButton(
+                onClick = {
+                    showSlashMenu = !showSlashMenu
+                    if (showSlashMenu && inputText.isBlank()) {
+                        inputText = "/"
+                    }
+                },
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(if (showSlashMenu || inputText.startsWith("/")) colors.primaryActionBg.copy(alpha = 0.2f) else colors.cardBg)
+            ) {
+                Text(
+                    text = "/",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 16.sp,
+                    color = if (showSlashMenu || inputText.startsWith("/")) colors.primaryActionBg else colors.textSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
             TextField(
                 value = inputText,
                 onValueChange = { inputText = it },
                 placeholder = {
                     Text(
-                        if (currentSettings.isConfigured()) "Command Discipline AI..." else "Type message or tap Configure above...",
+                        if (currentSettings.isConfigured()) "Type message or / for sections..." else "Type message or tap Configure above...",
                         fontSize = 13.sp,
                         color = colors.textMuted
                     )
@@ -464,6 +639,7 @@ fun AgentScreen(
                     if (inputText.isNotBlank() && status == AgentStatus.Idle) {
                         val textToSend = inputText
                         inputText = ""
+                        showSlashMenu = false
                         coroutineScope.launch {
                             engine.sendMessage(textToSend)
                         }
@@ -477,6 +653,7 @@ fun AgentScreen(
                     if (canSend) {
                         val textToSend = inputText
                         inputText = ""
+                        showSlashMenu = false
                         coroutineScope.launch {
                             engine.sendMessage(textToSend)
                         }
@@ -495,6 +672,168 @@ fun AgentScreen(
                     modifier = Modifier.size(16.dp)
                 )
             }
+        }
+    }
+}
+
+/**
+ * Interactive Slash Commands & Sections Menu
+ */
+@Composable
+fun SlashCommandMenu(
+    onSelectCommand: (String) -> Unit,
+    onDirectExecute: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = AppTheme.colors
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.cardElevated)
+            .border(1.dp, colors.borderSubtle, RoundedCornerShape(16.dp))
+            .padding(12.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Terminal,
+                        contentDescription = null,
+                        tint = colors.primaryActionBg,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "COMMANDS & SECTIONS",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = colors.textSecondary,
+                        letterSpacing = 1.sp
+                    )
+                }
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = colors.textMuted,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // 1. Protocol / Routine
+                SlashCommandItem(
+                    icon = Icons.Default.CheckCircle,
+                    iconColor = colors.successGreen,
+                    title = "/protocol",
+                    subtitle = "Daily Protocols • Tasks, routines & scheduled alarms",
+                    onClick = { onSelectCommand("/protocol ") }
+                )
+
+                // 2. Calisthenics Roadmap
+                SlashCommandItem(
+                    icon = Icons.Default.FitnessCenter,
+                    iconColor = Color(0xFF38BDF8),
+                    title = "/roadmap",
+                    subtitle = "Roadmap Section • Push, Pull, Legs, Core & Skills",
+                    onClick = { onSelectCommand("/roadmap ") }
+                )
+
+                // 3. Doubter Fuel
+                SlashCommandItem(
+                    icon = Icons.Default.Whatshot,
+                    iconColor = colors.accentFlame,
+                    title = "/fuel",
+                    subtitle = "Fuel Vault • Log critic, doubter & defiance vow",
+                    onClick = { onSelectCommand("/fuel ") }
+                )
+
+                // 4. Delete / Undo
+                SlashCommandItem(
+                    icon = Icons.Default.DeleteOutline,
+                    iconColor = Color(0xFFEF4444),
+                    title = "/delete",
+                    subtitle = "Delete Task • Remove last added or specific protocol",
+                    onClick = { onDirectExecute("delete the task you just added") }
+                )
+
+                // 5. Status / Audit
+                SlashCommandItem(
+                    icon = Icons.Default.BarChart,
+                    iconColor = colors.primaryActionBg,
+                    title = "/status",
+                    subtitle = "Discipline Audit • View today's streak & completed tasks",
+                    onClick = { onDirectExecute("show today's routine") }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SlashCommandItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    val colors = AppTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.cardBg)
+            .border(0.8.dp, colors.borderSubtle, RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(iconColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = colors.textPrimary
+            )
+            Text(
+                text = subtitle,
+                fontSize = 10.5.sp,
+                color = colors.textMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

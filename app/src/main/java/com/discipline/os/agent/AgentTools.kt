@@ -457,10 +457,34 @@ object AgentTools {
                 }
 
                 "delete_protocol" -> {
-                    val query = args.getString("query").trim()
+                    val query = args.optString("query", "").trim()
                     val allTasks = taskDao.getAllTasksSync()
-                    val target = allTasks.find {
-                        it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+
+                    val isRelativeOrPronoun = query.isBlank() ||
+                        query.equals("it", ignoreCase = true) ||
+                        query.equals("that", ignoreCase = true) ||
+                        query.equals("this", ignoreCase = true) ||
+                        query.equals("last", ignoreCase = true) ||
+                        query.equals("now it", ignoreCase = true) ||
+                        query.equals("now", ignoreCase = true) ||
+                        query.contains("just added", ignoreCase = true) ||
+                        query.contains("writ now", ignoreCase = true) ||
+                        query.contains("right now", ignoreCase = true) ||
+                        query.contains("the task", ignoreCase = true) ||
+                        query.contains("added", ignoreCase = true)
+
+                    val target = if (isRelativeOrPronoun) {
+                        allTasks.maxByOrNull { it.id } ?: allTasks.lastOrNull()
+                    } else {
+                        allTasks.find {
+                            it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                        } ?: allTasks.find { t ->
+                            val queryWords = query.lowercase().split("\\s+".toRegex())
+                                .filter { it.length > 2 && it !in listOf("the", "task", "protocol", "now", "delete", "remove", "cancel", "just", "writ", "right", "added") }
+                            queryWords.isNotEmpty() && queryWords.any { w -> t.title.contains(w, ignoreCase = true) }
+                        } ?: if (query.contains("task", ignoreCase = true) || query.contains("last", ignoreCase = true)) {
+                            allTasks.maxByOrNull { it.id }
+                        } else null
                     }
 
                     if (target != null) {

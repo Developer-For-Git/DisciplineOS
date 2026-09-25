@@ -473,6 +473,19 @@ class AiAgentEngine(
                     val time = obj.optString("scheduledTime", "Anytime")
                     "✅ **Protocol Created Successfully**\n\n• **Task:** $title\n• **Scheduled Time:** $time\n• **Alarm:** Armed\n\n*Execute without hesitation.*"
                 }
+                "delete_protocol" -> {
+                    val title = obj.optString("title", "Protocol")
+                    "🗑️ **Protocol Deleted Successfully**\n\n• **Task:** \"$title\"\n• **Status:** Disarmed & removed from routine."
+                }
+                "add_roadmap_step" -> {
+                    val title = obj.optString("title", "Milestone")
+                    val stage = obj.optString("stage", "Phase")
+                    "🗺️ **Roadmap Milestone Added**\n\n• **Milestone:** $title\n• **Pillar / Stage:** $stage\n\n*Saved to your Calisthenics Roadmap database.*"
+                }
+                "add_roadmap" -> {
+                    val title = obj.optString("title", "Roadmap")
+                    "🗺️ **Roadmap Journey Created**\n\n• **Journey:** $title\n\n*Initialized in Roadmap section.*"
+                }
                 "get_roadmaps" -> {
                     val milestones = obj.optJSONArray("milestones")
                     val sb = StringBuilder()
@@ -557,7 +570,191 @@ class AiAgentEngine(
             ?: ModelDownloadManager.findExistingModelFile(context, settings.customBaseUrl)
         val sizeMb = modelFile?.let { it.length() / (1024 * 1024) } ?: 0L
 
-        // 1. Natural Language Task Creation Intent Parsing
+        // 1. PROTOCOL DELETION / UNDO (Check this FIRST so deletion requests are never mistaken for additions)
+        val isDelete = lowerMsg.startsWith("/delete") ||
+                lowerMsg.contains("delete") ||
+                lowerMsg.contains("remove") ||
+                lowerMsg.contains("cancel task") ||
+                lowerMsg.contains("clear task") ||
+                lowerMsg.contains("undo") ||
+                lowerMsg.contains("erase")
+        if (isDelete) {
+            // Find what was previously added in chat history if user references "it", "that", "last", or "just added"
+            val lastAddedTitle = chatHistory.asReversed().mapNotNull { msg ->
+                if (msg.role == "tool" && msg.toolResult?.toolName == "add_protocol") {
+                    try { JSONObject(msg.content).optString("title") } catch (_: Exception) { null }
+                } else null
+            }.firstOrNull()
+
+            val isRelative = lowerMsg.contains(" it") || lowerMsg.endsWith("it") ||
+                    lowerMsg.contains(" that") || lowerMsg.endsWith("that") ||
+                    lowerMsg.contains("last") || lowerMsg.contains("just added") ||
+                    lowerMsg.contains("writ now") || lowerMsg.contains("right now") ||
+                    lowerMsg.contains("added") || lowerMsg == "delete" || lowerMsg == "/delete"
+
+            val target = if (isRelative && lastAddedTitle != null) {
+                lastAddedTitle
+            } else if (isRelative) {
+                "last"
+            } else {
+                lowerMsg.replace("/delete", "")
+                    .replace("delete", "")
+                    .replace("remove", "")
+                    .replace("cancel", "")
+                    .replace("undo", "")
+                    .replace("clear", "")
+                    .replace("the task", "")
+                    .replace("task", "")
+                    .replace("protocol", "")
+                    .replace("now", "")
+                    .trim()
+                    .ifBlank { "last" }
+            }
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "delete_protocol",
+                argumentsJson = JSONObject().apply {
+                    put("query", target)
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 2. FUEL SECTION INTENT (Doubter, Vow, Critic, Speech typos like 'full section' or 'feel section')
+        val isFuel = lowerMsg.startsWith("/fuel") ||
+                lowerMsg.contains("in fuel") ||
+                lowerMsg.contains("in full section") ||
+                lowerMsg.contains("in feel section") ||
+                lowerMsg.contains("in fule section") ||
+                lowerMsg.contains("fuel section") ||
+                lowerMsg.startsWith("fuel:") ||
+                lowerMsg.contains("add fuel") ||
+                lowerMsg.contains("log fuel") ||
+                lowerMsg.contains("vow") ||
+                lowerMsg.contains("doubter") ||
+                lowerMsg.contains("doubt") ||
+                lowerMsg.contains("teacher") ||
+                lowerMsg.contains("enemy") ||
+                lowerMsg.contains("mocked") ||
+                lowerMsg.contains("bullied") ||
+                lowerMsg.contains("hate")
+        if (isFuel) {
+            val isAdd = lowerMsg.length > 12 ||
+                    lowerMsg.startsWith("/fuel ") ||
+                    lowerMsg.contains("add fuel") ||
+                    lowerMsg.contains("log") ||
+                    lowerMsg.contains("teacher") ||
+                    lowerMsg.contains("tech") ||
+                    lowerMsg.contains("doubt") ||
+                    lowerMsg.contains("said") ||
+                    lowerMsg.contains("trust") ||
+                    lowerMsg.contains("told")
+
+            val toolCall = if (isAdd) {
+                var cleanedIncident = lastUserMsg
+                listOf("/fuel", "in full section", "in fuel section", "in feel section", "fuel section",
+                       "add fuel:", "add fuel", "log fuel:", "log fuel", "fuel:").forEach { prefix ->
+                    cleanedIncident = cleanedIncident.replace(Regex(Regex.escape(prefix), RegexOption.IGNORE_CASE), "")
+                }
+                cleanedIncident = cleanedIncident.trim(' ', ':', '-', '"', '\'')
+                if (cleanedIncident.isBlank()) cleanedIncident = "Someone doubted my path"
+
+                ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "add_fuel",
+                    argumentsJson = JSONObject().apply {
+                        put("personOrIncident", cleanedIncident.take(160))
+                        put("defianceVow", "Keep working in relentless silence. The results will shatter their words.")
+                        put("category", if (lowerMsg.contains("teacher") || lowerMsg.contains("tech")) "Teacher" else "Doubter / Critic")
+                    }.toString()
+                )
+            } else {
+                ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "get_fuel",
+                    argumentsJson = "{}"
+                )
+            }
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 3. ROADMAP SECTION INTENT (Calisthenics Pillars, Milestones, Progressions)
+        val isRoadmap = lowerMsg.startsWith("/roadmap") ||
+                lowerMsg.contains("roadmap") ||
+                lowerMsg.contains("calisthenic") ||
+                lowerMsg.contains("progression") ||
+                lowerMsg.contains("milestone") ||
+                lowerMsg.contains("handstand") ||
+                lowerMsg.contains("muscle up") ||
+                lowerMsg.contains("muscle-up") ||
+                lowerMsg.contains("planche") ||
+                lowerMsg.contains("front lever") ||
+                lowerMsg.contains("pillar")
+        if (isRoadmap) {
+            val isAddStep = lowerMsg.startsWith("/roadmap ") ||
+                    lowerMsg.contains("add to roadmap") ||
+                    lowerMsg.contains("add on roadmap") ||
+                    lowerMsg.contains("in roadmap") ||
+                    lowerMsg.contains("add roadmap") ||
+                    (lowerMsg.contains("roadmap") && (lowerMsg.contains("add") || lowerMsg.contains("step") || lowerMsg.contains("milestone")))
+
+            val toolCall = if (isAddStep) {
+                val pillar = when {
+                    lowerMsg.contains("core") || lowerMsg.contains("abs") || lowerMsg.contains("plank") || lowerMsg.contains("l-sit") -> "Pillar 4: CORE"
+                    lowerMsg.contains("leg") || lowerMsg.contains("squat") || lowerMsg.contains("lunge") -> "Pillar 3: LEGS"
+                    lowerMsg.contains("pull") || lowerMsg.contains("chin") || lowerMsg.contains("row") || lowerMsg.contains("muscle") -> "Pillar 2: PULL"
+                    lowerMsg.contains("push") || lowerMsg.contains("dip") -> "Pillar 1: PUSH"
+                    lowerMsg.contains("handstand") || lowerMsg.contains("planche") || lowerMsg.contains("skill") -> "Advanced Skills"
+                    else -> "Phase 1: Foundation"
+                }
+
+                var cleanedTitle = lastUserMsg
+                listOf("/roadmap", "add to roadmap", "add on roadmap", "add roadmap", "in roadmap", "roadmap:",
+                       "pillar 1: push", "pillar 2: pull", "pillar 3: legs", "pillar 4: core",
+                       "core:", "push:", "pull:", "legs:").forEach { prefix ->
+                    cleanedTitle = cleanedTitle.replace(Regex(Regex.escape(prefix), RegexOption.IGNORE_CASE), "")
+                }
+                cleanedTitle = cleanedTitle.trim(' ', ':', '-', '"', '\'')
+                if (cleanedTitle.isBlank()) cleanedTitle = "Progression Milestone"
+
+                ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "add_roadmap_step",
+                    argumentsJson = JSONObject().apply {
+                        put("roadmapQuery", "Calisthenics")
+                        put("stage", pillar)
+                        put("title", cleanedTitle)
+                        put("description", "Master strict form and progressive overload criteria.")
+                        put("repsOrCriteria", "3 sets of 8-12 clean reps")
+                    }.toString()
+                )
+            } else {
+                ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "get_roadmaps",
+                    argumentsJson = "{}"
+                )
+            }
+            return ChatMessage(
+                role = "assistant",
+                content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 4. PROTOCOL TASK CREATION VIA NLP PARSER
         val parsedTask = SmartTaskParser.parse(lastUserMsg)
         if (parsedTask.isTaskIntent) {
             val toolCall = ToolCall(
@@ -578,7 +775,7 @@ class AiAgentEngine(
             )
         }
 
-        // 2. Protocol Toggle / Completion
+        // 5. PROTOCOL TOGGLE / COMPLETION
         val isToggle = (lowerMsg.contains("mark") && (lowerMsg.contains("done") || lowerMsg.contains("complete") || lowerMsg.contains("finished"))) ||
                 lowerMsg.startsWith("done ") || lowerMsg.startsWith("finished ") || lowerMsg.contains("completed") ||
                 (lowerMsg.contains("push") && (lowerMsg.contains("done") || lowerMsg.contains("finish")))
@@ -607,27 +804,8 @@ class AiAgentEngine(
             )
         }
 
-        // 3. Protocol Deletion
-        val isDelete = lowerMsg.contains("delete") || lowerMsg.contains("remove") || lowerMsg.contains("cancel task") || lowerMsg.contains("clear task")
-        if (isDelete) {
-            val target = lowerMsg.replace("delete", "").replace("remove", "").replace("cancel", "").replace("task", "").replace("protocol", "").trim()
-            val toolCall = ToolCall(
-                id = UUID.randomUUID().toString(),
-                name = "delete_protocol",
-                argumentsJson = JSONObject().apply {
-                    put("query", if (target.isNotBlank()) target else "push-up")
-                }.toString()
-            )
-            return ChatMessage(
-                role = "assistant",
-                content = "Running local on-device command with **${settings.modelName}**...",
-                toolCalls = listOf(toolCall),
-                modelName = settings.modelName
-            )
-        }
-
-        // 4. Routine / Protocols Query
-        val isRoutine = lowerMsg.contains("routine") || lowerMsg.contains("protocols") || lowerMsg.contains("today's task") ||
+        // 6. ROUTINE / PROTOCOLS QUERY
+        val isRoutine = lowerMsg.startsWith("/status") || lowerMsg.contains("routine") || lowerMsg.contains("protocols") || lowerMsg.contains("today's task") ||
                 lowerMsg.contains("my tasks") || lowerMsg.contains("what do i have") || lowerMsg.contains("schedule today") ||
                 lowerMsg.contains("show task") || (lowerMsg.contains("today") && lowerMsg.contains("task"))
         if (isRoutine) {
@@ -639,51 +817,8 @@ class AiAgentEngine(
             )
         }
 
-        // 5. Calisthenics Roadmap
-        val isRoadmap = lowerMsg.contains("roadmap") || lowerMsg.contains("calisthenic") || lowerMsg.contains("progression") ||
-                lowerMsg.contains("milestone") || lowerMsg.contains("handstand") || lowerMsg.contains("muscle up") || lowerMsg.contains("pillar")
-        if (isRoadmap) {
-            return ChatMessage(
-                role = "assistant",
-                content = "Running local on-device command with **${settings.modelName}**...",
-                toolCalls = listOf(ToolCall(id = UUID.randomUUID().toString(), name = "get_roadmaps", argumentsJson = "{}")),
-                modelName = settings.modelName
-            )
-        }
-
-        // 6. Fuel / Doubter / Vow
-        val isFuel = lowerMsg.contains("fuel") || lowerMsg.contains("vow") || lowerMsg.contains("doubt") || lowerMsg.contains("teacher") ||
-                lowerMsg.contains("enemy") || lowerMsg.contains("hate") || lowerMsg.contains("critic") || lowerMsg.contains("scold") ||
-                lowerMsg.contains("bullied") || lowerMsg.contains("laughed") || lowerMsg.contains("mocked")
-        if (isFuel) {
-            val isAdd = lowerMsg.contains("teacher") || lowerMsg.contains("doubt") || lowerMsg.contains("said") || lowerMsg.contains("add") || lowerMsg.contains("log") || lowerMsg.length > 15
-            val toolCall = if (isAdd) {
-                ToolCall(
-                    id = UUID.randomUUID().toString(),
-                    name = "add_fuel",
-                    argumentsJson = JSONObject().apply {
-                        put("personOrIncident", lastUserMsg.take(120))
-                        put("defianceVow", "Keep working in silence. The results will shatter their words.")
-                        put("category", "Doubter / Critic")
-                    }.toString()
-                )
-            } else {
-                ToolCall(
-                    id = UUID.randomUUID().toString(),
-                    name = "get_fuel",
-                    argumentsJson = "{}"
-                )
-            }
-            return ChatMessage(
-                role = "assistant",
-                content = "Running local on-device command with **${settings.modelName}**...",
-                toolCalls = listOf(toolCall),
-                modelName = settings.modelName
-            )
-        }
-
-        // 7. Vibration
-        if (lowerMsg.contains("vibrat") || lowerMsg.contains("pulse") || lowerMsg.contains("haptic") || lowerMsg.contains("buzz")) {
+        // 7. VIBRATION / HAPTIC PULSE
+        if (lowerMsg.startsWith("/vibrate") || lowerMsg.contains("vibrat") || lowerMsg.contains("pulse") || lowerMsg.contains("haptic") || lowerMsg.contains("buzz")) {
             return ChatMessage(
                 role = "assistant",
                 content = "Running local on-device command with **${settings.modelName}**...",
@@ -692,7 +827,7 @@ class AiAgentEngine(
             )
         }
 
-        // 8. History / Streak
+        // 8. HISTORY / STREAK
         if (lowerMsg.contains("history") || lowerMsg.contains("streak") || lowerMsg.contains("score") || lowerMsg.contains("past day")) {
             return ChatMessage(
                 role = "assistant",
@@ -724,7 +859,7 @@ class AiAgentEngine(
         // 10. Direct conversational coaching & analytical response
         val responseText = when {
             lowerMsg.contains("hello") || lowerMsg.contains("hi") || lowerMsg.contains("hey") -> {
-                "⚡ **${settings.modelName} Active** (${if (sizeMb > 0) "$sizeMb MB on-device" else "configured"}).\n\nReady to command. You can ask me to:\n• *'Add a task today 7:15 pm to do 10 pushups'*\n• *'Show today's routine'*\n• *'Mark push-ups complete'*\n• *'Show calisthenics roadmap'*\n• *'Log fuel: someone doubted me'*\n• Or ask any technical, general knowledge, or coding question.\n\nWhat is our focus right now?"
+                "⚡ **${settings.modelName} Active** (${if (sizeMb > 0) "$sizeMb MB on-device" else "configured"}).\n\nReady to command. You can ask me to:\n• *'Add a task today 7:15 pm to do 10 pushups'*\n• *'Add to roadmap: Push pillar wall push-ups'*\n• *'In fuel section: my teacher doubted me'*\n• *'Delete the task you just added'*\n• *'Show today's routine'*\n• Or type `/` for slash command sections.\n\nWhat is our focus right now?"
             }
             lowerMsg.contains("motivat") || lowerMsg.contains("tired") || lowerMsg.contains("lazy") || lowerMsg.contains("give up") -> {
                 "⚡ **Discipline Over Motivation**\n\nMotivation is temporary and emotional. Discipline is an identity. When resistance appears, do not negotiate. Execute the very next scheduled protocol with strict adherence. Growth happens in the moments where you execute despite not wanting to."
@@ -759,9 +894,22 @@ object SmartTaskParser {
 
     fun parse(rawText: String): ParsedTask {
         val t = rawText.lowercase().trim()
-        val isAdd = t.contains("add") || t.contains("create") || t.contains("schedule") ||
-                t.contains("remind") || t.contains("set a task") || t.contains("put a task") ||
-                t.contains("new task") || t.contains("at a task") ||
+
+        // Deletions, fuel, and roadmap commands must NEVER be classified as protocol additions
+        if (t.contains("delete") || t.contains("remove") || t.contains("cancel") ||
+            t.contains("undo") || t.contains("clear") || t.contains("erase")) {
+            return ParsedTask(isTaskIntent = false, title = "", time = "", category = "General")
+        }
+
+        if (t.startsWith("/fuel") || t.contains("in fuel") || t.contains("in full section") ||
+            t.contains("in feel section") || t.contains("add fuel") || t.startsWith("/roadmap") ||
+            t.contains("on roadmap") || t.contains("to roadmap") || t.contains("in roadmap")) {
+            return ParsedTask(isTaskIntent = false, title = "", time = "", category = "General")
+        }
+
+        val isAdd = Regex("""\b(add|create|schedule|remind|set|put)\b""").containsMatchIn(t) ||
+                t.startsWith("/protocol") || t.startsWith("/task") ||
+                t.contains("at a task") || t.contains("new task") ||
                 (t.contains("pushup") && (t.contains("tday") || t.contains("today") || t.contains("tonight")))
 
         if (!isAdd) {
@@ -796,7 +944,7 @@ object SmartTaskParser {
 
         // 2. Title extraction
         var cleaned = t
-        listOf("okay", "ok", "please", "can you", "could you", "hey", "assistant", "discipline ai").forEach {
+        listOf("okay", "ok", "please", "can you", "could you", "hey", "assistant", "discipline ai", "/protocol", "/task").forEach {
             cleaned = cleaned.replace(Regex("""\b$it\b""", RegexOption.IGNORE_CASE), "")
         }
         listOf(
