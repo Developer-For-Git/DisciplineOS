@@ -1,5 +1,6 @@
 package com.discipline.os.ui
 
+import android.view.ViewGroup
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Cancel
@@ -20,12 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.discipline.os.data.DailyLog
 import org.json.JSONArray
 import java.text.SimpleDateFormat
@@ -57,39 +61,93 @@ fun HistoryDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
+        val view = LocalView.current
+        SideEffect {
+            val window = (view.parent as? DialogWindowProvider)?.window
+            window?.let { win ->
+                win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                win.setWindowAnimations(0)
+            }
+        }
+
         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = CardWhite,
-            border = BorderStroke(1.dp, BorderSubtle),
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.85f)
-                .padding(vertical = 20.dp)
+            modifier = Modifier.fillMaxSize(),
+            color = CanvasBg
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                // 1. Header with Badge & Close Button
+                // 1. Top Header Bar with Back Button & Badge
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Circular Back Button
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(CardWhite)
+                                .border(1.dp, BorderSubtle, CircleShape)
+                                .clickable { onDismiss() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column {
+                            Text(
+                                text = "Past Days & Progress",
+                                color = TextPrimary,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.5).sp
+                            )
+                            Text(
+                                text = "Audit daily compounding discipline",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    // Audit Badge
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(AccentCyanSoft)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .border(1.dp, AccentCyan.copy(alpha = 0.35f), CircleShape)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "📈", fontSize = 13.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "📈", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "EXECUTION HISTORY",
+                                text = "AUDIT",
                                 color = AccentCyan,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -97,86 +155,102 @@ fun HistoryDialog(
                             )
                         }
                     }
-
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(CanvasBg)
-                            .clickable { onDismiss() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Title & Subtitle
-                Text(
-                    text = "Past Days & Progress",
-                    color = TextPrimary,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp
-                )
-                Text(
-                    text = "Audit your daily compounding consistency & discipline",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Stats Summary Strip
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(CanvasBg)
-                        .border(1.dp, BorderSubtle, RoundedCornerShape(16.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(CardWhite)
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(18.dp))
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text(text = "TOTAL LOGGED", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "${dailyLogs.size} Days", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "${dailyLogs.size} ${if (dailyLogs.size == 1) "Day" else "Days"}",
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(BorderSubtle))
                     Column {
                         Text(text = "AVERAGE SCORE", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "$avgScore%", color = AccentCyan, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "$avgScore%",
+                            color = when {
+                                avgScore >= 75 -> SuccessGreen
+                                avgScore >= 50 -> AccentCyan
+                                else -> AccentFlame
+                            },
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(BorderSubtle))
                     Column {
                         Text(text = "STATUS", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = if (avgScore >= 70) "Disciplined 🔥" else "In Progress ⚡",
-                            color = if (avgScore >= 70) SuccessGreen else Color(0xFFFFB74D),
+                            text = when {
+                                avgScore >= 80 -> "Elite 🔥"
+                                avgScore >= 60 -> "Strong ⚡"
+                                avgScore >= 40 -> "Building 🚀"
+                                else -> "In Progress ⚡"
+                            },
+                            color = if (avgScore >= 75) SuccessGreen else AccentFlame,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // 2. Scrollable List of Past Days
+                // Section Title
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RECORDED DAYS (${dailyLogs.size})",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Tap to expand habits",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Content Area: Empty State or Scrollable List of Past Days
                 if (dailyLogs.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(CardWhite)
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(20.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
                             Text(text = "🗓️", fontSize = 36.sp)
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
@@ -200,7 +274,8 @@ fun HistoryDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 12.dp)
                     ) {
                         itemsIndexed(dailyLogs) { index, log ->
                             PastDayCard(
@@ -214,7 +289,7 @@ fun HistoryDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Done Button
                 Button(
@@ -224,9 +299,11 @@ fun HistoryDialog(
                         containerColor = PrimaryActionBg,
                         contentColor = PrimaryActionFg
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
                 ) {
-                    Text("Close History", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Back to Dashboard", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

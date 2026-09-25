@@ -340,7 +340,10 @@ fun SystemScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
@@ -356,23 +359,29 @@ fun SystemScreen(
                                 )
                             }
                             Spacer(modifier = Modifier.width(12.dp))
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "PAST DAYS HISTORY",
                                     color = TextPrimary,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
+                                    letterSpacing = 0.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "Habit streaks & day-by-day logs",
                                     color = TextSecondary,
-                                    fontSize = 12.sp
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        // View History Button
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // View History Button (Matches Reset Now pill layout)
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -381,21 +390,14 @@ fun SystemScreen(
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.DateRange,
-                                    contentDescription = null,
-                                    tint = PrimaryActionFg,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "View History",
-                                    color = PrimaryActionFg,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text(
+                                text = "View History",
+                                color = PrimaryActionFg,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                         }
                     }
 
