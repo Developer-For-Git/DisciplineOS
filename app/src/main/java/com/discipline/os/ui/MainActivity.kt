@@ -15,10 +15,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
@@ -40,6 +42,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.discipline.os.alarm.AlarmScheduler
 import com.discipline.os.alarm.VibrationHelper
+import com.discipline.os.agent.AiAgentEngine
 import com.discipline.os.data.AppDatabase
 import com.discipline.os.data.FuelEntry
 import com.discipline.os.data.Task
@@ -98,6 +101,7 @@ class MainActivity : ComponentActivity() {
 
             DisciplineTheme(isDarkMode = isDarkMode) {
                 var selectedTab by remember { mutableStateOf(0) }
+                val agentEngine = remember { AiAgentEngine(this@MainActivity, db) }
                 val tasks by taskDao.getAllTasks().collectAsState(initial = emptyList())
                 val fuelList by fuelDao.getAllFuel().collectAsState(initial = emptyList())
                 val videoList by videoDao.getAllVideos().collectAsState(initial = emptyList())
@@ -297,7 +301,10 @@ class MainActivity : ComponentActivity() {
                                     sharedVideoTitle = ""
                                 }
                             )
-                            2 -> FuelScreen(
+                            2 -> AgentScreen(
+                                engine = agentEngine
+                            )
+                            3 -> FuelScreen(
                                 fuelList = fuelList,
                                 onAddFuel = { person, vow, cat ->
                                     lifecycleScope.launch(Dispatchers.IO) {
@@ -316,7 +323,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             )
-                            3 -> SystemScreen(
+                            4 -> SystemScreen(
                                 totalTasks = tasks.size,
                                 completedTasks = tasks.count { it.isCompleted },
                                 totalVideos = videoList.size,
@@ -364,15 +371,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Floating Capsule Dock (Apple / TripGlide Style with 4 First-Class Tabs)
-                    FloatingBottomDock(
-                        selectedTab = selectedTab,
-                        onTabSelected = { selectedTab = it },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
-                            .padding(bottom = 16.dp)
-                    )
+                    // Floating Capsule Dock (Apple / TripGlide Style with 5 First-Class Tabs)
+                    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+                    if (imeBottom == 0.dp) {
+                        FloatingBottomDock(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = 16.dp)
+                        )
+                    }
                 }
 
                 // OTA Update Pop-up Dialog
@@ -407,7 +417,7 @@ class MainActivity : ComponentActivity() {
 
 /**
  * Floating Stadium Capsule Navigation Dock
- * 4 Tabs: Protocols (0), Vault (1), Fuel (2), System/Control (3)
+ * 5 Tabs: Protocols (0), Vault (1), Copilot AI (2), Fuel (3), System/Control (4)
  */
 @Composable
 fun FloatingBottomDock(
@@ -426,9 +436,9 @@ fun FloatingBottomDock(
                 .clip(CircleShape)
                 .background(colors.dockBg)
                 .border(if (colors.isDark) 1.dp else 0.dp, colors.dockBorder, CircleShape)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Tab 0: Home / Protocols
             DockItem(
@@ -448,22 +458,31 @@ fun FloatingBottomDock(
                 onClick = { onTabSelected(1) }
             )
 
-            // Tab 2: Fuel / Prove Them Wrong
+            // Tab 2: Copilot AI (Autonomous Agent)
             DockItem(
                 isSelected = selectedTab == 2,
-                icon = Icons.Outlined.FavoriteBorder,
-                selectedIcon = Icons.Filled.Favorite,
-                contentDescription = "Fuel",
+                icon = Icons.Outlined.AutoAwesome,
+                selectedIcon = Icons.Filled.AutoAwesome,
+                contentDescription = "Copilot",
                 onClick = { onTabSelected(2) }
             )
 
-            // Tab 3: System / Sync & Control Center
+            // Tab 3: Fuel / Prove Them Wrong
             DockItem(
                 isSelected = selectedTab == 3,
+                icon = Icons.Outlined.FavoriteBorder,
+                selectedIcon = Icons.Filled.Favorite,
+                contentDescription = "Fuel",
+                onClick = { onTabSelected(3) }
+            )
+
+            // Tab 4: System / Sync & Control Center
+            DockItem(
+                isSelected = selectedTab == 4,
                 icon = Icons.Outlined.GridView,
                 selectedIcon = Icons.Filled.GridView,
                 contentDescription = "System",
-                onClick = { onTabSelected(3) }
+                onClick = { onTabSelected(4) }
             )
         }
     }
