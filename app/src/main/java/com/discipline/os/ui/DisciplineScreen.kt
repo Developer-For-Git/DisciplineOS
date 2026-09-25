@@ -56,7 +56,8 @@ fun DisciplineScreen(
     onToggleSubtask: (Task, Int) -> Unit,
     onUpdateTask: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
-    onAddTask: (String, String, String, Int, String, Boolean) -> Unit
+    onAddTask: (String, String, String, Int, String, Boolean) -> Unit,
+    onShowHistory: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
@@ -348,22 +349,49 @@ fun DisciplineScreen(
                                 letterSpacing = 1.2.sp
                             )
 
-                            // Heart / Pulse button
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(CanvasBg)
-                                    .border(1.dp, BorderSubtle, CircleShape)
-                                    .clickable { VibrationHelper.triggerRapidVibration(context) },
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Favorite,
-                                    contentDescription = "Pulse",
-                                    tint = AccentFlame,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                // Past Days History Button
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(AccentCyanSoft)
+                                        .border(1.dp, AccentCyan.copy(alpha = 0.35f), CircleShape)
+                                        .clickable { onShowHistory() }
+                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = "📊", fontSize = 11.sp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Past Days",
+                                            color = AccentCyan,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                // Heart / Pulse button
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(CanvasBg)
+                                        .border(1.dp, BorderSubtle, CircleShape)
+                                        .clickable { VibrationHelper.triggerRapidVibration(context) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Favorite,
+                                        contentDescription = "Pulse",
+                                        tint = AccentFlame,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
 

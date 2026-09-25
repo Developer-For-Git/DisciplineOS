@@ -33,7 +33,8 @@ data class DailyLog(
     @PrimaryKey val date: String, // "YYYY-MM-DD"
     val completedCount: Int,
     val totalCount: Int,
-    val percentage: Float
+    val percentage: Float,
+    val tasksSnapshotJson: String = "[]"
 )
 
 @Entity(tableName = "videos")

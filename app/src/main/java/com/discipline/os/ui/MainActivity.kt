@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
         val taskDao = db.taskDao()
         val fuelDao = db.fuelDao()
         val videoDao = db.videoDao()
+        val dailyLogDao = db.dailyLogDao()
         val prefs = getSharedPreferences("discipline_prefs", Context.MODE_PRIVATE)
 
         setContent {
@@ -100,6 +101,10 @@ class MainActivity : ComponentActivity() {
                 val tasks by taskDao.getAllTasks().collectAsState(initial = emptyList())
                 val fuelList by fuelDao.getAllFuel().collectAsState(initial = emptyList())
                 val videoList by videoDao.getAllVideos().collectAsState(initial = emptyList())
+                val dailyLogs by dailyLogDao.getAllLogs().collectAsState(initial = emptyList())
+
+                // Past Days History Dialog state
+                var showHistoryDialog by remember { mutableStateOf(false) }
 
                 // OTA Wi-Fi Update state
                 var pendingUpdateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
@@ -242,6 +247,9 @@ class MainActivity : ComponentActivity() {
                                             AlarmScheduler.scheduleTaskAlarm(this@MainActivity, newTask.copy(id = newId))
                                         }
                                     }
+                                },
+                                onShowHistory = {
+                                    showHistoryDialog = true
                                 }
                             )
                             1 -> VideoScreen(
@@ -334,6 +342,9 @@ class MainActivity : ComponentActivity() {
                                             ).show()
                                         }
                                     }
+                                },
+                                onShowHistory = {
+                                    showHistoryDialog = true
                                 }
                             )
                         }
@@ -354,6 +365,14 @@ class MainActivity : ComponentActivity() {
                         UpdateDialog(
                             updateInfo = pendingUpdateInfo!!,
                             onDismiss = { showUpdateDialog = false }
+                        )
+                    }
+
+                    // Past Days History Pop-up Dialog
+                    if (showHistoryDialog) {
+                        HistoryDialog(
+                            dailyLogs = dailyLogs,
+                            onDismiss = { showHistoryDialog = false }
                         )
                     }
                 }

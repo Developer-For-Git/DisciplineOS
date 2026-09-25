@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.withLock
 
 @Database(
     entities = [Task::class, FuelEntry::class, DailyLog::class, VideoEntry::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,6 +23,12 @@ abstract class AppDatabase : RoomDatabase() {
         private var INSTANCE: AppDatabase? = null
         private val seedMutex = Mutex()
 
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE daily_logs ADD COLUMN tasksSnapshotJson TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -30,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "discipline_os.db"
                 )
+                .addMigrations(MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -277,6 +284,32 @@ abstract class AppDatabase : RoomDatabase() {
                 if (updated != v) {
                     videoDao.updateVideo(updated)
                 }
+            }
+
+            // Daily Log seeding (ensure yesterday 2026-09-23 exists with exact snapshot)
+            val logDao = db.dailyLogDao()
+            val existingLogs = logDao.getAllLogsSync().map { it.date }.toSet()
+            if ("2026-09-23" !in existingLogs) {
+                val yesterdayTasksJson = """[
+                    {"title":"Master GCC Assembly","category":"Coding","priority":1,"isCompleted":true,"scheduledTime":"09:00"},
+                    {"title":"Coding for 1 hour / Code with Harry","category":"Coding","priority":1,"isCompleted":true,"scheduledTime":"07:30"},
+                    {"title":"Do 10 push-ups (Strength & energy)","category":"Health","priority":1,"isCompleted":true,"scheduledTime":"07:15"},
+                    {"title":"College homework & subject catch-up","category":"College","priority":1,"isCompleted":true,"scheduledTime":"17:27"},
+                    {"title":"Zero porn & addictive shorts (Focus shield)","category":"Discipline","priority":1,"isCompleted":true,"scheduledTime":""},
+                    {"title":"Be better than yesterday (1% improvement)","category":"Mindset","priority":1,"isCompleted":true,"scheduledTime":"22:00"},
+                    {"title":"Cyber Security (TryHackMe / Practice)","category":"Security","priority":2,"isCompleted":false,"scheduledTime":"20:27"},
+                    {"title":"Learn Mandarin (Vocab & Pinyin)","category":"Language","priority":2,"isCompleted":false,"scheduledTime":"18:30"}
+                ]""".trimIndent()
+
+                logDao.insertLog(
+                    DailyLog(
+                        date = "2026-09-23",
+                        completedCount = 6,
+                        totalCount = 8,
+                        percentage = 75.0f,
+                        tasksSnapshotJson = yesterdayTasksJson
+                    )
+                )
             }
         }
     }

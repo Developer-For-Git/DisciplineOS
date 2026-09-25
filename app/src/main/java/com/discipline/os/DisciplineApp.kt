@@ -65,12 +65,24 @@ class DisciplineApp : Application() {
             val completed = tasks.count { it.isCompleted }
             val pct = if (total > 0) (completed.toFloat() / total) * 100f else 0f
 
+            val tasksArray = org.json.JSONArray()
+            for (t in tasks) {
+                tasksArray.put(org.json.JSONObject().apply {
+                    put("title", t.title)
+                    put("category", t.category)
+                    put("priority", t.priority)
+                    put("isCompleted", t.isCompleted)
+                    put("scheduledTime", t.scheduledTime)
+                })
+            }
+
             db.dailyLogDao().insertLog(
                 DailyLog(
                     date = lastDate,
                     completedCount = completed,
                     totalCount = total,
-                    percentage = pct
+                    percentage = pct,
+                    tasksSnapshotJson = tasksArray.toString()
                 )
             )
 
