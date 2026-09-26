@@ -111,6 +111,23 @@ Every screen in DisciplineOS is handcrafted with Jetpack Compose, edge-to-edge s
       <i>Built for deep work, mental toughness, and unrelenting focus on high-leverage goals.</i>
     </td>
   </tr>
+  <tr>
+    <td align="center" width="33%">
+      <b>🌐 13. Free Multi-Cloud AI Gateway</b><br/><br/>
+      <img src="docs/screenshots/11_free_ai_providers.png" width="100%" alt="Free AI Cloud Gateway" /><br/>
+      <i>Zero-cost verified model gateway: NaraRouter (Ling 3.0 Flash, Space Bunny), OpenRouter (Nemotron, Laguna), and OpenCode.</i>
+    </td>
+    <td align="center" width="33%">
+      <b>⚡ 14. Live Diagnostic & Model Chips</b><br/><br/>
+      <img src="docs/screenshots/12_model_connection_verified.png" width="100%" alt="Model Connection Verified" /><br/>
+      <i>Instant connection latency test, status indicator, and one-tap model suggestion chips.</i>
+    </td>
+    <td align="center" width="33%">
+      <b>🎯 15. Context-Aware Autonomous Actions</b><br/><br/>
+      <img src="docs/screenshots/13_agent_execution_live.png" width="100%" alt="Agent Live Action Execution" /><br/>
+      <i>Accurate, zero-hallucination structured tool execution for protocol creation, modification, and context deletion.</i>
+    </td>
+  </tr>
 </table>
 </div>
 
@@ -127,6 +144,8 @@ Every screen in DisciplineOS is handcrafted with Jetpack Compose, edge-to-edge s
   * `create_full_roadmap`: Synthesizes multi-step technical or fitness roadmaps with structured milestones.
   * `delete_roadmap_step`: Removes milestones from active tracks.
   * `get_daily_protocols` & `get_past_history`: Audits past discipline scores and schedules.
+* **Verified Free Models & Multi-Provider Gateway:** Out-of-the-box support for NaraRouter (`ling-3.0-flash-sante-free`, `space-bunny-alpha`, `laguna-s-2.1`), OpenRouter (`nvidia/nemotron-3-super-120b-a12b:free`, `stealth/space-bunny-alpha`), OpenCode (`space-bunny-free`), and On-Device GGUF (Gemma 2 2B, Llama 3.2 1B).
+* **Tag Sanitization & Robust Null Handling:** Built-in output filter strips raw thinking tags (`<think>`, `</role>`) and handles OpenAI JSON null payloads seamlessly.
 * **Top Horizontal Model Switcher Bar:** Instantly hot-swap between active on-device GGUF models and cloud endpoints directly from the chat header.
 * **Smart Slash Commands (`/`):** Type `/` in the chat bar to trigger quick action suggestions for `/protocol`, `/roadmap`, `/fuel`, and `/history`.
 * **Universal General Knowledge:** Answers coding, systems architecture, fitness, and philosophy questions with direct, concise clarity.

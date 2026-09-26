@@ -12,5 +12,8 @@ scripts/test*.py
 scripts/verify*.py
 scripts/find*.py
 scripts/*.json
-*.png
-*.xml
+/*.png
+/*.xml
+!docs/screenshots/*.png
+__pycache__/
+*.pyc
