@@ -285,7 +285,11 @@ class AiAgentEngine(
                 "assistant" -> {
                     val aObj = JSONObject().apply {
                         put("role", "assistant")
-                        put("content", m.content.ifBlank { " " })
+                        if (m.content.isNotBlank()) {
+                            put("content", m.content)
+                        } else {
+                            put("content", JSONObject.NULL)
+                        }
                     }
                     if (m.toolCalls.isNotEmpty()) {
                         val tcArr = JSONArray()
@@ -331,11 +335,20 @@ class AiAgentEngine(
         val msgObj = choice.optJSONObject("message")
             ?: throw IllegalStateException("Invalid choice: 'message' missing")
 
-        val rawContent = msgObj.optString("content", "").trim()
+        val rawContent = if (msgObj.isNull("content")) "" else msgObj.optString("content", "").trim()
+        val finalContent = if (rawContent.isNotBlank()) {
+            rawContent
+        } else if (msgObj.has("reasoning_content") && !msgObj.isNull("reasoning_content")) {
+            msgObj.optString("reasoning_content", "").trim()
+        } else if (msgObj.has("reasoning") && !msgObj.isNull("reasoning")) {
+            msgObj.optString("reasoning", "").trim()
+        } else {
+            ""
+        }
         val toolCalls = mutableListOf<ToolCall>()
 
         // 1. Parse standard OpenAI tool_calls
-        if (msgObj.has("tool_calls")) {
+        if (msgObj.has("tool_calls") && !msgObj.isNull("tool_calls")) {
             val tcArr = msgObj.getJSONArray("tool_calls")
             for (i in 0 until tcArr.length()) {
                 val tc = tcArr.getJSONObject(i)
@@ -350,10 +363,10 @@ class AiAgentEngine(
         }
 
         // 2. Fallback parser for Tiny Models / Ollama models that output tool calls in plain text
-        if (toolCalls.isEmpty() && rawContent.isNotBlank()) {
+        if (toolCalls.isEmpty() && finalContent.isNotBlank()) {
             // Pattern A: Action: tool_name({"arg": "val"})
             val actionRegex = Regex("""Action:\s*([a-zA-Z0-9_]+)\s*\((.*?)\)""", RegexOption.DOT_MATCHES_ALL)
-            val match = actionRegex.find(rawContent)
+            val match = actionRegex.find(finalContent)
             if (match != null) {
                 val name = match.groupValues[1]
                 val args = match.groupValues[2].trim().ifBlank { "{}" }
@@ -361,7 +374,7 @@ class AiAgentEngine(
             } else {
                 // Pattern B: ```json { "tool": "tool_name", "args": {...} } ```
                 val jsonBlockRegex = Regex("""```(?:json)?\s*(\{[\s\S]*?\})\s*```""")
-                val blockMatch = jsonBlockRegex.find(rawContent)
+                val blockMatch = jsonBlockRegex.find(finalContent)
                 if (blockMatch != null) {
                     try {
                         val parsed = JSONObject(blockMatch.groupValues[1])
@@ -379,9 +392,19 @@ class AiAgentEngine(
 
         return ChatMessage(
             role = "assistant",
-            content = rawContent,
+            content = sanitizeModelOutput(finalContent),
             toolCalls = toolCalls
         )
+    }
+
+    private fun sanitizeModelOutput(text: String): String {
+        if (text.isBlank()) return ""
+        // Remove <think>...</think> or <thought>...</thought> blocks
+        var cleaned = text.replace(Regex("""<(?:think|thought)>[\s\S]*?</(?:think|thought)>""", RegexOption.IGNORE_CASE), "")
+        // Remove rogue open/close tags like </think>, <think>, </role>, <role>, </thought>, <thought>
+        cleaned = cleaned.replace(Regex("""^(\s*</?(?:role|thought|think)>\s*)+""", RegexOption.IGNORE_CASE), "")
+        cleaned = cleaned.replace(Regex("""(\s*</?(?:role|thought|think)>\s*)+$""", RegexOption.IGNORE_CASE), "")
+        return cleaned.trim()
     }
 
     private fun buildAnthropicPayload(payload: JSONObject, settings: AiSettings, chatHistory: List<ChatMessage>) {
@@ -420,7 +443,7 @@ class AiAgentEngine(
                 }
             }
         }
-        return ChatMessage(role = "assistant", content = sb.toString())
+        return ChatMessage(role = "assistant", content = sanitizeModelOutput(sb.toString()))
     }
 
     suspend fun testConnection(settings: AiSettings): Pair<Boolean, String> = withContext(Dispatchers.IO) {
@@ -430,7 +453,14 @@ class AiAgentEngine(
             }
             val testHistory = listOf(ChatMessage(role = "user", content = "Reply with 'OK' if you can read this."))
             val result = callProvider(settings, testHistory)
-            Pair(true, "Connected successfully!\nResponse: ${result.content.take(120)}")
+            val responsePreview = if (result.content.isNotBlank()) {
+                result.content.take(120)
+            } else if (result.toolCalls.isNotEmpty()) {
+                "Tool Call: ${result.toolCalls.first().name}"
+            } else {
+                "Ready (HTTP 200)"
+            }
+            Pair(true, "Connected successfully!\nResponse: $responsePreview")
         } catch (e: Exception) {
             Pair(false, "Connection Failed: ${e.localizedMessage ?: e.javaClass.simpleName}")
         }

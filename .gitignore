@@ -8,3 +8,9 @@
 .cxx/
 dump*.xml
 *.part
+scripts/test*.py
+scripts/verify*.py
+scripts/find*.py
+scripts/*.json
+*.png
+*.xml

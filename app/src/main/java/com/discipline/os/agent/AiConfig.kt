@@ -17,10 +17,20 @@ enum class AiProvider(
         defaultModel = "Google Gemma 2 2B Instruct",
         requiresApiKey = false
     ),
+    NARA_ROUTER(
+        displayName = "NaraRouter (Free Models)",
+        defaultBaseUrl = "https://router.bynara.id/v1/chat/completions",
+        defaultModel = "ling-3.0-flash-sante-free"
+    ),
     OPENROUTER(
         displayName = "OpenRouter (Recommended)",
         defaultBaseUrl = "https://openrouter.ai/api/v1/chat/completions",
-        defaultModel = "google/gemini-2.0-flash-exp:free"
+        defaultModel = "nvidia/nemotron-3-super-120b-a12b:free"
+    ),
+    OPENCODE(
+        displayName = "OpenCode",
+        defaultBaseUrl = "https://opencode.ai/zen/v1/chat/completions",
+        defaultModel = "space-bunny-free"
     ),
     OPENAI(
         displayName = "OpenAI",
@@ -124,9 +134,9 @@ object TinyModelCatalog {
 }
 
 data class AiSettings(
-    val provider: AiProvider = AiProvider.OPENROUTER,
+    val provider: AiProvider = AiProvider.NARA_ROUTER,
     val apiKey: String = "",
-    val modelName: String = AiProvider.OPENROUTER.defaultModel,
+    val modelName: String = AiProvider.NARA_ROUTER.defaultModel,
     val customBaseUrl: String = "",
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     val temperature: Float = 0.3f
@@ -177,8 +187,8 @@ Always be concise, disciplined, proactive, and confirm the specific actions you 
 
         fun load(context: Context): AiSettings {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val providerStr = prefs.getString(KEY_PROVIDER, AiProvider.OPENROUTER.name) ?: AiProvider.OPENROUTER.name
-            val provider = try { AiProvider.valueOf(providerStr) } catch (_: Exception) { AiProvider.OPENROUTER }
+            val providerStr = prefs.getString(KEY_PROVIDER, AiProvider.NARA_ROUTER.name) ?: AiProvider.NARA_ROUTER.name
+            val provider = try { AiProvider.valueOf(providerStr) } catch (_: Exception) { AiProvider.NARA_ROUTER }
             return AiSettings(
                 provider = provider,
                 apiKey = prefs.getString(KEY_API_KEY, "") ?: "",

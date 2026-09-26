@@ -1503,10 +1503,12 @@ fun AgentModelConfigScreen(
                     )
 
                     val cloudProviders = listOf(
-                        AiProvider.OPENROUTER to "Unified gateway for 300+ models (Gemini, Claude, Llama). Recommended.",
+                        AiProvider.NARA_ROUTER to "Free models (Ling 3.0 Flash, Space Bunny, Nemotron, Laguna). Zero cost.",
+                        AiProvider.OPENROUTER to "Unified gateway with verified free models (Nemotron, Laguna, Space Bunny).",
+                        AiProvider.OPENCODE to "OpenCode Zen endpoint supporting space-bunny-free.",
+                        AiProvider.NVIDIA_NIM to "High-throughput enterprise AI inference endpoints.",
                         AiProvider.OPENAI to "Official OpenAI API for GPT-4o and GPT-4o-mini.",
                         AiProvider.ANTHROPIC to "Direct Claude 3.5 Sonnet & Claude 3.5 Haiku API.",
-                        AiProvider.NVIDIA_NIM to "High-throughput enterprise AI inference endpoints.",
                         AiProvider.CUSTOM to "Connect any custom OpenAI-compatible server or proxy."
                     )
 
@@ -1608,10 +1610,12 @@ fun AgentModelConfigScreen(
 
                 AiDialogScreen.PROVIDER_CONFIG -> {
                     val helpHint = when (selectedProvider) {
-                        AiProvider.OPENROUTER -> "Get an API key at openrouter.ai/keys (Free & paid models available)"
+                        AiProvider.NARA_ROUTER -> "NaraRouter (router.bynara.id) — Verified active free models! Usable at zero cost."
+                        AiProvider.OPENROUTER -> "OpenRouter (openrouter.ai/keys) — Verified active free models (Nemotron, Laguna, Space Bunny)."
+                        AiProvider.OPENCODE -> "OpenCode Zen endpoint (opencode.ai) — space-bunny-free verified active!"
+                        AiProvider.NVIDIA_NIM -> "NVIDIA NIM (build.nvidia.com) — Enterprise AI inference."
                         AiProvider.OPENAI -> "Get an API key at platform.openai.com/api-keys"
                         AiProvider.ANTHROPIC -> "Get an API key at console.anthropic.com/settings/keys"
-                        AiProvider.NVIDIA_NIM -> "Get an API key at build.nvidia.com"
                         AiProvider.CUSTOM -> "Enter your custom base URL and API key (if required)"
                         else -> ""
                     }
@@ -1695,11 +1699,25 @@ fun AgentModelConfigScreen(
 
                     // Model Suggestions Chips
                     val suggestions = when (selectedProvider) {
+                        AiProvider.NARA_ROUTER -> listOf(
+                            "ling-3.0-flash-sante-free",
+                            "space-bunny-alpha",
+                            "space-bunny-alpha-bynara",
+                            "ling-3.0-flash-fin-free",
+                            "laguna-s-2.1",
+                            "nemotron-3-ultra-free",
+                            "nemotron-3-super-free"
+                        )
                         AiProvider.OPENROUTER -> listOf(
-                            "google/gemini-2.0-flash-exp:free",
-                            "anthropic/claude-3.5-sonnet",
-                            "meta-llama/llama-3.3-70b-instruct",
-                            "deepseek/deepseek-chat"
+                            "nvidia/nemotron-3-super-120b-a12b:free",
+                            "stealth/space-bunny-alpha",
+                            "poolside/laguna-s-2.1:free",
+                            "nvidia/nemotron-3-ultra-550b-a55b:free",
+                            "liquid/lfm-2.5-2.6b:free",
+                            "cohere/north-mini-code:free"
+                        )
+                        AiProvider.OPENCODE -> listOf(
+                            "space-bunny-free"
                         )
                         AiProvider.OPENAI -> listOf(
                             "gpt-4o-mini",
@@ -1710,8 +1728,9 @@ fun AgentModelConfigScreen(
                             "claude-3-5-sonnet-20241022"
                         )
                         AiProvider.NVIDIA_NIM -> listOf(
-                            "meta/llama-3.3-70b-instruct",
-                            "nvidia/nemotron-4-340b-instruct"
+                            "google/gemma-3-12b-it",
+                            "ibm/granite-3.0-8b-instruct",
+                            "meta/llama-3.3-70b-instruct"
                         )
                         else -> emptyList()
                     }
@@ -1744,7 +1763,7 @@ fun AgentModelConfigScreen(
                         }
                     }
 
-                    if (selectedProvider == AiProvider.CUSTOM || selectedProvider == AiProvider.NVIDIA_NIM) {
+                    if (selectedProvider == AiProvider.CUSTOM || selectedProvider == AiProvider.NVIDIA_NIM || selectedProvider == AiProvider.NARA_ROUTER || selectedProvider == AiProvider.OPENCODE) {
                         Spacer(modifier = Modifier.height(14.dp))
                         OutlinedTextField(
                             value = customBaseUrl,
