@@ -60,7 +60,8 @@ fun DisciplineScreen(
     onAddTask: (String, String, String, Int, String, Boolean) -> Unit,
     onShowHistory: () -> Unit = {},
     onOpenAi: () -> Unit = {},
-    onOpenRoadmap: () -> Unit = {}
+    onOpenRoadmap: () -> Unit = {},
+    onOpenTelemetry: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
@@ -530,6 +531,101 @@ fun DisciplineScreen(
                                     contentDescription = "Action",
                                     tint = PrimaryActionBg,
                                     modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4.5 Life Telemetry & Movement Quick Glance Card
+            item(contentType = "telemetry_glance") {
+                val stepTracker = remember { com.discipline.os.telemetry.StepTracker.getInstance(context) }
+                val devManager = remember { com.discipline.os.telemetry.DeviceControlManager.getInstance(context) }
+                val stepStats by stepTracker.stepStats.collectAsState()
+                val telemetry by devManager.telemetry.collectAsState()
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardWhite),
+                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(22.dp))
+                        .clickable { onOpenTelemetry() }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(AccentFlameSoft),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.DirectionsWalk,
+                                    contentDescription = "Activity",
+                                    tint = AccentFlame,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${stepStats.todaySteps} steps",
+                                        color = TextPrimary,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = " • ${String.format(java.util.Locale.US, "%.1f", stepStats.distanceKm)} km",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (telemetry.screenTime.hasPermission)
+                                        "Screen: ${telemetry.screenTime.formattedTotalTime} (${telemetry.screenTime.productivePercentage.toInt()}% focus)"
+                                    else
+                                        "Data: ${telemetry.network.formattedTotal} • ${telemetry.network.connectionType}",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // Action arrow pill
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(SecondaryActionBg)
+                                .border(1.dp, BorderSubtle, CircleShape)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Radar",
+                                    color = TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = "Radar",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }

@@ -339,6 +339,23 @@ object AgentTools {
                 },
                 required = listOf("title", "stepsJson")
             ))
+
+            put(buildToolObj(
+                name = "get_device_telemetry",
+                description = "Get real-time device telemetry: physical walking steps, distance walked in km, active minutes, calories burned, screen time duration, productive vs distraction app time ratio, top apps used today, and network data usage."
+            ))
+
+            put(buildToolObj(
+                name = "add_walking_steps",
+                description = "Manually record or add walking steps to today's step count (e.g. after a jog, treadmill walk, or manual workout).",
+                properties = JSONObject().apply {
+                    put("steps", JSONObject().apply {
+                        put("type", "integer")
+                        put("description", "Number of steps to add (e.g. 1000, 3000)")
+                    })
+                },
+                required = listOf("steps")
+            ))
         }
     }
 
@@ -1152,6 +1169,72 @@ object AgentTools {
                             put("title", title)
                             put("category", category)
                             put("totalSteps", nodesToInsert.size)
+                        }.toString()
+                    )
+                }
+
+                "get_device_telemetry" -> {
+                    val manager = com.discipline.os.telemetry.DeviceControlManager.getInstance(context)
+                    val tasks = taskDao.getAllTasksSync()
+                    val completed = tasks.count { it.isCompleted }
+                    val rate = if (tasks.isNotEmpty()) completed.toFloat() / tasks.size.toFloat() else 0f
+                    manager.refreshTelemetry(rate)
+                    val tel = manager.telemetry.value
+
+                    val appArray = JSONArray()
+                    tel.screenTime.topApps.take(10).forEach { app ->
+                        appArray.put(JSONObject().apply {
+                            put("appName", app.appName)
+                            put("packageName", app.packageName)
+                            put("category", app.category.name)
+                            put("timeForeground", app.formattedTime)
+                        })
+                    }
+
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Retrieved telemetry: ${tel.steps.todaySteps} steps, ${tel.screenTime.formattedTotalTime} screen time (${tel.screenTime.productivePercentage.toInt()}% productive), ${tel.network.formattedTotal} data",
+                        outputJson = JSONObject().apply {
+                            put("disciplineScore", tel.disciplineScore)
+                            put("focusStatus", tel.focusStatus)
+                            put("todaySteps", tel.steps.todaySteps)
+                            put("stepGoal", tel.steps.stepGoal)
+                            put("distanceKm", tel.steps.distanceKm)
+                            put("caloriesKcal", tel.steps.caloriesKcal)
+                            put("activeMinutes", tel.steps.activeMinutes)
+                            put("totalScreenTime", tel.screenTime.formattedTotalTime)
+                            put("productiveTime", tel.screenTime.formattedProductiveTime)
+                            put("distractionTime", tel.screenTime.formattedDistractionTime)
+                            put("productivePercentage", tel.screenTime.productivePercentage)
+                            put("hasUsageStatsPermission", tel.screenTime.hasPermission)
+                            put("topApps", appArray)
+                            put("networkTotal", tel.network.formattedTotal)
+                            put("networkWifi", tel.network.formattedWifi)
+                            put("networkMobile", tel.network.formattedMobile)
+                            put("connectionType", tel.network.connectionType)
+                        }.toString()
+                    )
+                }
+
+                "add_walking_steps" -> {
+                    val steps = args.getInt("steps")
+                    val stepTracker = com.discipline.os.telemetry.StepTracker.getInstance(context)
+                    stepTracker.addManualSteps(steps)
+                    val currentStats = stepTracker.stepStats.value
+                    VibrationHelper.triggerRapidVibration(context)
+
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Logged +$steps steps. Today's total is now ${currentStats.todaySteps} steps (${String.format(java.util.Locale.US, "%.2f", currentStats.distanceKm)} km).",
+                        outputJson = JSONObject().apply {
+                            put("success", true)
+                            put("addedSteps", steps)
+                            put("todaySteps", currentStats.todaySteps)
+                            put("distanceKm", currentStats.distanceKm)
+                            put("caloriesKcal", currentStats.caloriesKcal)
+                            put("activeMinutes", currentStats.activeMinutes)
                         }.toString()
                     )
                 }

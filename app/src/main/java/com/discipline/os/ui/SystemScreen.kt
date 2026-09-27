@@ -49,10 +49,12 @@ fun SystemScreen(
     onToggleTimeFormat: () -> Unit = {},
     onDeduplicateData: () -> Unit,
     onShowHistory: () -> Unit = {},
-    onClearHistory: () -> Unit = {}
+    onClearHistory: () -> Unit = {},
+    onOpenAi: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var systemTab by remember { mutableStateOf(0) } // 0: Life Telemetry, 1: System & Sync
     var apiStatusText by remember { mutableStateOf("Ready on port 8080") }
     var isCheckingApi by remember { mutableStateOf(false) }
     var isVibrationEnabled by remember { mutableStateOf(VibrationHelper.isVibrationEnabled(context)) }
@@ -64,26 +66,28 @@ fun SystemScreen(
     val currentVersionCode = remember { UpdateManager.getCurrentVersionCode(context) }
     val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(CanvasBg)
-            .padding(horizontal = 20.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = (if (navBarBottom > 48.dp) navBarBottom else 48.dp) + 90.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Header
-        item {
+        // Pinned Header Section & Segmented Control
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 10.dp, bottom = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header Row
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
-                        text = "System & Sync",
+                        text = if (systemTab == 0) "Life Telemetry" else "System & Sync",
                         color = TextPrimary,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
@@ -91,7 +95,7 @@ fun SystemScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "API control, auto-reset & hardware engine",
+                        text = if (systemTab == 0) "Steps, screen time & data radar" else "API control, auto-reset & hardware engine",
                         color = TextSecondary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
@@ -116,12 +120,94 @@ fun SystemScreen(
                     )
                 }
             }
+
+            // High-Contrast Segmented Capsule Switcher
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .background(CardWhite)
+                    .border(1.dp, BorderSubtle, CircleShape)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Tab 0: Life Telemetry
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(CircleShape)
+                        .background(if (systemTab == 0) PrimaryActionBg else Color.Transparent)
+                        .clickable { systemTab = 0 }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsWalk,
+                            contentDescription = "Telemetry",
+                            tint = if (systemTab == 0) PrimaryActionFg else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Life Telemetry",
+                            color = if (systemTab == 0) PrimaryActionFg else TextSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Tab 1: System & Server
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(CircleShape)
+                        .background(if (systemTab == 1) PrimaryActionBg else Color.Transparent)
+                        .clickable { systemTab = 1 }
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "System",
+                            tint = if (systemTab == 1) PrimaryActionFg else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "System & Sync",
+                            color = if (systemTab == 1) PrimaryActionFg else TextSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
 
-        // 2. Local Ktor API Server & PC Sync Card
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = CardWhite),
+        if (systemTab == 0) {
+            val completionRate = if (totalTasks > 0) completedTasks.toFloat() / totalTasks.toFloat() else 0f
+            TelemetryScreen(
+                protocolCompletionRate = completionRate,
+                onOpenAi = onOpenAi,
+                showHeader = false,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(CanvasBg)
+                    .padding(horizontal = 20.dp),
+                contentPadding = PaddingValues(top = 10.dp, bottom = (if (navBarBottom > 48.dp) navBarBottom else 48.dp) + 90.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 1. Local Ktor API Server & PC Sync Card
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardWhite),
                 shape = RoundedCornerShape(26.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -977,6 +1063,8 @@ fun SystemScreen(
             }
         }
     }
+}
+}
 
     if (activeUpdateInfo != null) {
         UpdateDialog(

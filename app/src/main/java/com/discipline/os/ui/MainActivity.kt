@@ -276,6 +276,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenRoadmap = {
                                     selectedTab = 1
+                                },
+                                onOpenTelemetry = {
+                                    selectedTab = 5
                                 }
                             )
                             1 -> RoadmapScreen(
@@ -474,6 +477,9 @@ class MainActivity : ComponentActivity() {
                                     lifecycleScope.launch(Dispatchers.IO) {
                                         dailyLogDao.clearAllLogs()
                                     }
+                                },
+                                onOpenAi = {
+                                    selectedTab = 3
                                 }
                             )
                         }
