@@ -10,7 +10,14 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.discipline.os.telemetry.StepTracker
 import com.discipline.os.ui.MainActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class SyncForegroundService : Service() {
     companion object {
@@ -36,20 +43,36 @@ class SyncForegroundService : Service() {
         }
     }
 
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var stepJob: Job? = null
+    private var lastNotifiedSteps = -1
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForeground(NOTIFICATION_ID, buildNotification(0, 0f))
         LocalSyncServer.start(this)
+
+        val tracker = StepTracker.getInstance(this)
+        tracker.startTracking()
+
+        stepJob = serviceScope.launch {
+            tracker.stepStats.collect { stats ->
+                updateNotification(stats.todaySteps, stats.distanceKm)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         LocalSyncServer.start(this)
+        StepTracker.getInstance(this).startTracking()
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stepJob?.cancel()
+        serviceScope.cancel()
         LocalSyncServer.stop()
     }
 
@@ -59,10 +82,10 @@ class SyncForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "DisciplineOS AI Assistant Bridge",
+                "DisciplineOS Pedometer & AI Bridge",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps local sync server active for 24/7 PC assistant control"
+                description = "Keeps direct phone pedometer and local sync server active 24/7"
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
@@ -70,24 +93,42 @@ class SyncForegroundService : Service() {
         }
     }
 
-    private fun buildNotification(): Notification {
+    private fun updateNotification(steps: Int, distanceKm: Float) {
+        // Update notification when step count changes noticeably
+        if (lastNotifiedSteps == -1 || kotlin.math.abs(steps - lastNotifiedSteps) >= 3) {
+            lastNotifiedSteps = steps
+            val nm = getSystemService(NotificationManager::class.java)
+            nm?.notify(NOTIFICATION_ID, buildNotification(steps, distanceKm))
+        }
+    }
+
+    private fun buildNotification(steps: Int = 0, distanceKm: Float = 0f): Notification {
         val openIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val distStr = String.format(java.util.Locale.US, "%.1f", distanceKm)
+        val title = if (steps > 0) {
+            "⚡ DisciplineOS • 🚶 %,d Steps ($distStr km)".format(steps)
+        } else {
+            "⚡ DisciplineOS • Direct Phone Pedometer Active"
+        }
+
+        val text = "Direct phone movement sensors active • Port 8080"
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(com.discipline.os.R.drawable.ic_stat_bridge)
             .setColor(0xFF8B5CF6.toInt())
-            .setContentTitle("⚡ DisciplineOS • AI Bridge Active")
-            .setContentText("Listening on port 8080 • Direct assistant control")
-            .setSubText("Obsidian Sync Engine")
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSubText("Life Telemetry")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .setBigContentTitle("⚡ DisciplineOS • AI Companion Bridge")
-                    .setSummaryText("Port 8080")
-                    .bigText("24/7 background bridge active. Assistant can schedule alarms, complete habits, and queue videos instantly.")
+                    .setBigContentTitle(title)
+                    .setSummaryText("Pedometer")
+                    .bigText("Phone hardware pedometer tracking footsteps 24/7 in background. Walking: %,d steps today ($distStr km). Local assistant server active on port 8080.".format(steps))
             )
             .setOngoing(true)
             .setContentIntent(pendingIntent)

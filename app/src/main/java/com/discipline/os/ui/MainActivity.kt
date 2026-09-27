@@ -63,6 +63,11 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
+    private val requestActivityPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ ->
+            com.discipline.os.telemetry.StepTracker.getInstance(this).refreshSensors()
+        }
+
     private var sharedVideoUrl by mutableStateOf("")
     private var sharedVideoTitle by mutableStateOf("")
 
@@ -73,6 +78,13 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Request Physical Activity permission on Android 10+ (API 29+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+                requestActivityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
             }
         }
 
@@ -527,6 +539,11 @@ class MainActivity : ComponentActivity() {
                 sharedVideoTitle = title.trim()
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.discipline.os.telemetry.StepTracker.getInstance(this).refreshSensors()
     }
 }
 

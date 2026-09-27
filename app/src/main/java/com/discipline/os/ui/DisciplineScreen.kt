@@ -538,7 +538,7 @@ fun DisciplineScreen(
                 }
             }
 
-            // 4.5 Life Telemetry & Movement Quick Glance Card
+            // 4.5 Featured Direct Phone Step Tracker & Telemetry Card
             item(contentType = "telemetry_glance") {
                 val stepTracker = remember { com.discipline.os.telemetry.StepTracker.getInstance(context) }
                 val devManager = remember { com.discipline.os.telemetry.DeviceControlManager.getInstance(context) }
@@ -547,85 +547,159 @@ fun DisciplineScreen(
 
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CardWhite),
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, BorderSubtle, RoundedCornerShape(22.dp))
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(24.dp))
                         .clickable { onOpenTelemetry() }
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(18.dp)
                     ) {
+                        // Top Header Row: Sensor Status Badge + Radar Pill
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(AccentFlameSoft),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DirectionsWalk,
-                                    contentDescription = "Activity",
-                                    tint = AccentFlame,
-                                    modifier = Modifier.size(19.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (stepStats.isTracking) SuccessGreen else AccentFlame)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (stepStats.isTracking) "DIRECT PHONE SENSOR" else "STEP SENSOR PAUSED",
+                                    color = if (stepStats.isTracking) SuccessGreen else AccentFlame,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
                                 )
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
+
+                            // Radar button pill
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(SecondaryActionBg)
+                                    .border(1.dp, BorderSubtle, CircleShape)
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "${stepStats.todaySteps} steps",
+                                        text = "Life Radar",
                                         color = TextPrimary,
-                                        fontSize = 15.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Text(
-                                        text = " • ${String.format(java.util.Locale.US, "%.1f", stepStats.distanceKm)} km",
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Radar",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(13.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = if (telemetry.screenTime.hasPermission)
-                                        "Screen: ${telemetry.screenTime.formattedTotalTime} (${telemetry.screenTime.productivePercentage.toInt()}% focus)"
-                                    else
-                                        "Data: ${telemetry.network.formattedTotal} • ${telemetry.network.connectionType}",
-                                    color = TextMuted,
-                                    fontSize = 11.sp
-                                )
                             }
                         }
 
-                        // Action arrow pill
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Big Step Numbers + Daily Goal
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = "%,d".format(stepStats.todaySteps),
+                                    color = TextPrimary,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = (-0.5).sp
+                                )
+                                Text(
+                                    text = " steps",
+                                    color = TextSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(bottom = 3.dp, start = 4.dp)
+                                )
+                            }
+                            Text(
+                                text = "${stepStats.progressPercent}% of ${stepStats.stepGoal} goal",
+                                color = TextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Progress Bar
                         Box(
                             modifier = Modifier
-                                .clip(CircleShape)
-                                .background(SecondaryActionBg)
-                                .border(1.dp, BorderSubtle, CircleShape)
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(BorderSubtle)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth((stepStats.progressFraction).coerceIn(0f, 1f))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(if (stepStats.progressFraction >= 1f) SuccessGreen else AccentFlame)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Metrics Pill Row: Distance • Calories • Active Minutes
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🚶 ${String.format(java.util.Locale.US, "%.2f", stepStats.distanceKm)} km",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "🔥 ${stepStats.caloriesKcal} kcal",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "⏱️ ${stepStats.activeMinutes} min walk",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        if (!stepStats.hasPermission) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(AccentFlameSoft)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
                                 Text(
-                                    text = "Radar",
-                                    color = TextPrimary,
+                                    text = "⚠️ Physical activity permission needed for hardware pedometer • Tap to open",
+                                    color = AccentFlame,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Radar",
-                                    tint = TextSecondary,
-                                    modifier = Modifier.size(14.dp)
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                         }

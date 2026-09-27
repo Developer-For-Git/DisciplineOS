@@ -1,7 +1,11 @@
 package com.discipline.os.ui
 
+import android.Manifest
 import android.content.Context
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -47,6 +51,12 @@ fun TelemetryScreen(
     val context = LocalContext.current
     val manager = remember { DeviceControlManager.getInstance(context) }
     val stepTracker = remember { StepTracker.getInstance(context) }
+
+    val activityPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        stepTracker.refreshSensors()
+    }
 
     val telemetry by manager.telemetry.collectAsState()
     val stepStats by stepTracker.stepStats.collectAsState()
@@ -303,8 +313,8 @@ fun TelemetryScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = if (stepStats.hasHardwareSensor) "Hardware Pedometer Active" else "Step Sensor Active",
-                                    color = if (stepStats.hasHardwareSensor) SuccessGreen else TextMuted,
+                                    text = if (stepStats.isTracking) "Direct Phone Pedometer Active" else "Step Sensor Initializing",
+                                    color = if (stepStats.isTracking) SuccessGreen else TextMuted,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -324,6 +334,68 @@ fun TelemetryScreen(
                                 text = "Goal: ${stepStats.stepGoal}",
                                 color = TextPrimary,
                                 fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Live Sensor Source and Cadence Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(SecondaryActionBg)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(if (stepStats.isTracking) SuccessGreen else AccentFlame)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stepStats.sensorSource,
+                                color = TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        if (stepStats.recentCadenceSpm > 0) {
+                            Text(
+                                text = "🚶 ${stepStats.recentCadenceSpm} spm",
+                                color = AccentFlame,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Text(
+                                text = "24/7 Monitored",
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    if (!stepStats.hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                activityPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentFlame),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Grant Activity Permission for Hardware Pedometer",
+                                color = Color.White,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -409,6 +481,16 @@ fun TelemetryScreen(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "MANUAL CALIBRATION / TEST CONTROLS",
+                        color = TextMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Emulator / Live Testing Quick Actions
                     Row(

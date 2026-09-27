@@ -102,9 +102,19 @@ object LocalSyncServer {
                     val vPending = videos.count { !it.isWatched }
                     val vWatched = videos.count { it.isWatched }
 
+                    val stepStats = com.discipline.os.telemetry.StepTracker.getInstance(context).stepStats.value
+                    val curVersion = try {
+                        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "2.21.0"
+                    } catch (_: Exception) { "2.21.0" }
+
                     val status = JSONObject().apply {
                         put("app", "DisciplineOS")
-                        put("version", "2.1")
+                        put("version", curVersion)
+                        put("today_steps", stepStats.todaySteps)
+                        put("step_goal", stepStats.stepGoal)
+                        put("distance_km", stepStats.distanceKm)
+                        put("calories_kcal", stepStats.caloriesKcal)
+                        put("sensor_source", stepStats.sensorSource)
                         put("total_tasks", tasks.size)
                         put("completed_count", completed)
                         put("percentage", if (tasks.isNotEmpty()) (completed * 100 / tasks.size) else 0)
@@ -115,6 +125,39 @@ object LocalSyncServer {
                         put("port", PORT)
                     }
                     responseJson = status.toString()
+                }
+
+                // 1.5 Real-Time Telemetry & Step Status
+                path == "/api/telemetry" && method == "GET" -> {
+                    val stepStats = com.discipline.os.telemetry.StepTracker.getInstance(context).stepStats.value
+                    val screenStats = com.discipline.os.telemetry.AppUsageTracker.getTodayUsageStats(context)
+                    val netStats = com.discipline.os.telemetry.NetworkUsageTracker.getNetworkStats(context)
+
+                    val telemetryJson = JSONObject().apply {
+                        put("steps", JSONObject().apply {
+                            put("today_steps", stepStats.todaySteps)
+                            put("step_goal", stepStats.stepGoal)
+                            put("distance_km", stepStats.distanceKm)
+                            put("calories_kcal", stepStats.caloriesKcal)
+                            put("active_minutes", stepStats.activeMinutes)
+                            put("sensor_source", stepStats.sensorSource)
+                            put("has_permission", stepStats.hasPermission)
+                            put("recent_cadence_spm", stepStats.recentCadenceSpm)
+                        })
+                        put("screen_time", JSONObject().apply {
+                            put("total_screen_time_formatted", screenStats.formattedTotalTime)
+                            put("productive_time_formatted", screenStats.formattedProductiveTime)
+                            put("productive_percentage", screenStats.productivePercentage)
+                            put("has_permission", screenStats.hasPermission)
+                        })
+                        put("network", JSONObject().apply {
+                            put("wifi_bytes", netStats.wifiBytes)
+                            put("mobile_bytes", netStats.mobileBytes)
+                            put("total_formatted", netStats.formattedTotal)
+                            put("connection_type", netStats.connectionType)
+                        })
+                    }
+                    responseJson = telemetryJson.toString()
                 }
 
                 // 2. Tasks List with optional filters (?category=... or ?priority=...)
