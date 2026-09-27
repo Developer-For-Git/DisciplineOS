@@ -128,6 +128,23 @@ Every screen in DisciplineOS is handcrafted with Jetpack Compose, edge-to-edge s
       <i>Accurate, zero-hallucination structured tool execution for protocol creation, modification, and context deletion.</i>
     </td>
   </tr>
+  <tr>
+    <td align="center" width="33%">
+      <b>🚶 16. Direct Phone Pedometer</b><br/><br/>
+      <img src="docs/screenshots/14_direct_phone_step_card.png" width="100%" alt="Direct Phone Pedometer" /><br/>
+      <i>Hardware step sensor with 24/7 background counting, featured home dashboard card, and instant recalibration step reset.</i>
+    </td>
+    <td align="center" width="33%">
+      <b>📡 17. Life Telemetry & Radar</b><br/><br/>
+      <img src="docs/screenshots/15_life_telemetry_radar.png" width="100%" alt="Life Telemetry Screen" /><br/>
+      <i>Comprehensive daily execution radar: physical steps, protocol adherence, and focus ratio aggregated in real time.</i>
+    </td>
+    <td align="center" width="33%">
+      <b>📱 18. OS UsageEvents Screen Time</b><br/><br/>
+      <img src="docs/screenshots/16_app_screentime_radar.png" width="100%" alt="App Screen Time Radar" /><br/>
+      <i>Exact Android OS UsageEvents engine: millisecond-accurate foreground tracking, distraction ratios, and zero fake stats.</i>
+    </td>
+  </tr>
 </table>
 </div>
 
@@ -181,6 +198,12 @@ Every screen in DisciplineOS is handcrafted with Jetpack Compose, edge-to-edge s
 ### 8. 🚀 In-App Wi-Fi Auto-Update Engine (OTA Hub)
 * **Zero-Play-Store Private Updates:** Over-the-air firmware updates streamed directly over local Wi-Fi from your development PC.
 * **Native Package Installer:** Uses secure `FileProvider` URIs to trigger Android's native package installer with one tap.
+
+### 9. 🚶 Real-Time Phone Pedometer & System OS Telemetry
+* **Hardware Step Sensor Engine:** Integrates Android's low-power hardware `TYPE_STEP_COUNTER` and fallback 3D motion accelerometer with dynamic peak detection.
+* **Instant Step Recalibration:** Dedicated `[ 🔄 Reset ]` buttons on both Home and Telemetry dashboards allow instantly clearing accidental steps and recalibrating the hardware sensor baseline.
+* **Exact Android UsageEvents Engine:** Replaces inaccurate interval statistics with millisecond-exact `UsageEvents` stream analysis, calculating precise foreground app usage, productive-to-distraction ratios, and hourly usage trends with zero simulated data.
+* **Proactive System Permission Prompt:** Startup verification that detects missing usage access permissions and provides a single-tap gateway into Android system settings.
 
 ---
 
