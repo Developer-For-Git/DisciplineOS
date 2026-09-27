@@ -660,7 +660,7 @@ fun DisciplineScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Metrics Pill Row: Distance • Calories • Active Minutes
+                        // Metrics Pill Row: Distance • Calories • Active Minutes + Reset Button
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -679,11 +679,31 @@ fun DisciplineScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "⏱️ ${stepStats.activeMinutes} min walk",
+                                text = "⏱️ ${stepStats.activeMinutes} min",
                                 color = TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(SecondaryActionBg)
+                                    .border(1.dp, BorderSubtle, CircleShape)
+                                    .clickable {
+                                        stepTracker.resetTodaySteps()
+                                        devManager.refreshTelemetry(progress)
+                                        com.discipline.os.alarm.VibrationHelper.triggerRapidVibration(context)
+                                        android.widget.Toast.makeText(context, "Steps reset to 0", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "🔄 Reset",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         if (!stepStats.hasPermission) {

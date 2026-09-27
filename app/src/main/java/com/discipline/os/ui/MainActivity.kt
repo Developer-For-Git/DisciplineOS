@@ -14,6 +14,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.outlined.AltRoute
@@ -51,6 +54,7 @@ import com.discipline.os.data.Roadmap
 import com.discipline.os.data.RoadmapNode
 import com.discipline.os.data.Task
 import com.discipline.os.data.VideoEntry
+import com.discipline.os.telemetry.AppUsageTracker
 import com.discipline.os.update.UpdateDialog
 import com.discipline.os.update.UpdateInfo
 import com.discipline.os.update.UpdateManager
@@ -133,6 +137,17 @@ class MainActivity : ComponentActivity() {
                 var pendingUpdateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
 
+                // System Telemetry & Permissions Onboarding State
+                var hasUsagePermission by remember { mutableStateOf(AppUsageTracker.hasUsageStatsPermission(this@MainActivity)) }
+                var showPermissionPrompt by remember { mutableStateOf(false) }
+
+                LaunchedEffect(Unit) {
+                    if (!hasUsagePermission) {
+                        kotlinx.coroutines.delay(1000)
+                        showPermissionPrompt = true
+                    }
+                }
+
                 // 1. Reactive live update flow: Pops up on screen instantly when update is published from PC
                 LaunchedEffect(Unit) {
                     UpdateManager.liveUpdateNotificationFlow.collect { info ->
@@ -150,6 +165,7 @@ class MainActivity : ComponentActivity() {
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_RESUME) {
+                            hasUsagePermission = AppUsageTracker.hasUsageStatsPermission(this@MainActivity)
                             lifecycleScope.launch(Dispatchers.IO) {
                                 // First check if an offline update is already downloaded and saved on device
                                 val offlineSaved = UpdateManager.getSavedOfflineUpdate(this@MainActivity)
@@ -517,6 +533,79 @@ class MainActivity : ComponentActivity() {
                     UpdateDialog(
                         updateInfo = pendingUpdateInfo!!,
                         onDismiss = { showUpdateDialog = false }
+                    )
+                }
+
+                // System Telemetry Access Prompt Dialog
+                if (showPermissionPrompt && !hasUsagePermission) {
+                    AlertDialog(
+                        onDismissRequest = { showPermissionPrompt = false },
+                        shape = RoundedCornerShape(26.dp),
+                        containerColor = CardWhite,
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(AccentFlameSoft),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "Permission",
+                                        tint = AccentFlame,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Enable System Telemetry",
+                                    color = TextPrimary,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        },
+                        text = {
+                            Column {
+                                Text(
+                                    text = "DisciplineOS reads your real-time application focus, screen time, and hardware movement directly from Android OS.",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📊", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Usage Access: Read actual screen time & apps", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🚶", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Physical Activity: Hardware pedometer", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showPermissionPrompt = false
+                                    AppUsageTracker.openUsageAccessSettings(this@MainActivity)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryActionBg, contentColor = PrimaryActionFg),
+                                shape = CircleShape
+                            ) {
+                                Text("Open Android Settings ⚙️", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showPermissionPrompt = false }) {
+                                Text("Later", color = TextMuted)
+                            }
+                        }
                     )
                 }
                 }

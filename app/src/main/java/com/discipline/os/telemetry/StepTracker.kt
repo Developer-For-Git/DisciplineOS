@@ -258,6 +258,25 @@ class StepTracker private constructor(private val context: Context) : SensorEven
         persistSteps(current, "Manual Calibration / Direct Phone", System.currentTimeMillis(), 0)
     }
 
+    fun resetTodaySteps() {
+        val today = getTodayDateString()
+        prefs.edit()
+            .putString("last_step_date", today)
+            .putInt("today_steps", 0)
+            .putInt("last_boot_steps", -1)
+            .apply()
+
+        recentStepTimestamps.clear()
+
+        updateState(
+            steps = 0,
+            goal = _stepStats.value.stepGoal,
+            source = _stepStats.value.sensorSource,
+            timestampMs = System.currentTimeMillis(),
+            cadence = 0
+        )
+    }
+
     fun setStepGoal(goal: Int) {
         val validGoal = goal.coerceIn(1000, 50000)
         prefs.edit().putInt("step_goal", validGoal).apply()

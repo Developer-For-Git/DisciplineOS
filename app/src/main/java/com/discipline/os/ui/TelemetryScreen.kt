@@ -536,8 +536,32 @@ fun TelemetryScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "+1,000 Steps",
+                                text = "+1,000",
                                 color = PrimaryActionFg,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Reset Steps
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(CircleShape)
+                                .background(SecondaryActionBg)
+                                .border(1.dp, BorderSubtle, CircleShape)
+                                .clickable {
+                                    stepTracker.resetTodaySteps()
+                                    manager.refreshTelemetry(protocolCompletionRate)
+                                    VibrationHelper.triggerRapidVibration(context)
+                                    Toast.makeText(context, "Today's steps reset to 0", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🔄 Reset",
+                                color = TextSecondary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
