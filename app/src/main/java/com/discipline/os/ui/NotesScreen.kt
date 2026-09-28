@@ -160,15 +160,40 @@ fun NotesScreen(
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Layout Toggle (Grid vs List)
-                    IconButton(
-                        onClick = { isGridView = !isGridView },
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // New Checklist button
+                    Box(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(colors.cardBg)
                             .border(1.dp, colors.borderSubtle, CircleShape)
+                            .clickable {
+                                startInChecklistMode = true
+                                isCreatingNote = true
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CheckBox,
+                            contentDescription = "New Checklist",
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Layout Toggle (Grid vs List)
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(colors.cardBg)
+                            .border(1.dp, colors.borderSubtle, CircleShape)
+                            .clickable { isGridView = !isGridView },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (isGridView) Icons.Outlined.ViewAgenda else Icons.Outlined.GridView,
@@ -177,21 +202,42 @@ fun NotesScreen(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
                     // AI Quick Ask
-                    IconButton(
-                        onClick = onOpenAi,
+                    Box(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(colors.accentFlameSoft)
                             .border(1.dp, colors.accentFlame.copy(alpha = 0.3f), CircleShape)
+                            .clickable { onOpenAi() },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = "AI Notes",
                             tint = colors.accentFlame,
                             modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Add Note Circle Button (Accent Flame)
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentFlame)
+                            .clickable {
+                                startInChecklistMode = false
+                                isCreatingNote = true
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "New Note",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -322,18 +368,34 @@ fun NotesScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Tap the bar below to take a note, list, or ask Agent.",
+                            text = "Tap + in the top bar to take a note, checklist, or ask Agent.",
                             color = colors.textMuted,
                             fontSize = 13.sp
                         )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Button(
+                            onClick = {
+                                startInChecklistMode = false
+                                isCreatingNote = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.accentFlame, contentColor = Color.White),
+                            shape = CircleShape
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Take a Note", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             } else {
+                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val dockBottomClearance = (if (navBottom > 48.dp) navBottom else 48.dp) + 38.dp
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(bottom = 120.dp),
+                    contentPadding = PaddingValues(bottom = dockBottomClearance + 64.dp, top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Pinned Notes Section
@@ -433,78 +495,7 @@ fun NotesScreen(
             }
         }
 
-        // 5. Floating Bottom Bar: Google Keep "Take a note..." Capsule
-        val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-        val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val dockBottomClearance = (if (navBottom > 48.dp) navBottom else 48.dp) + 42.dp
-
-        if (imeBottom == 0.dp) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = dockBottomClearance)
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(colors.cardBg)
-                        .border(1.dp, colors.borderSubtle, RoundedCornerShape(28.dp))
-                        .clickable {
-                            startInChecklistMode = false
-                            isCreatingNote = true
-                        }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Take a note...",
-                        color = colors.textMuted,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Quick checklist button
-                        IconButton(
-                            onClick = {
-                                startInChecklistMode = true
-                                isCreatingNote = true
-                            },
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.CheckBox,
-                                contentDescription = "New Checklist",
-                                tint = colors.textSecondary,
-                                modifier = Modifier.size(19.dp)
-                            )
-                        }
-
-                        // Quick Agent directive button
-                        IconButton(
-                            onClick = {
-                                startInChecklistMode = false
-                                isCreatingNote = true
-                            },
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.EditNote,
-                                contentDescription = "New Note",
-                                tint = colors.textPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 6. Note Editor Modal Dialog (Create or Edit)
+        // Note Editor Modal Dialog (Create or Edit)
         if (isCreatingNote) {
             NoteEditorDialog(
                 note = null,
