@@ -21,11 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.outlined.AltRoute
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
@@ -50,6 +52,7 @@ import com.discipline.os.alarm.VibrationHelper
 import com.discipline.os.agent.AiAgentEngine
 import com.discipline.os.data.AppDatabase
 import com.discipline.os.data.FuelEntry
+import com.discipline.os.data.Note
 import com.discipline.os.data.Roadmap
 import com.discipline.os.data.RoadmapNode
 import com.discipline.os.data.Task
@@ -100,6 +103,7 @@ class MainActivity : ComponentActivity() {
         val videoDao = db.videoDao()
         val dailyLogDao = db.dailyLogDao()
         val roadmapDao = db.roadmapDao()
+        val noteDao = db.noteDao()
         val prefs = getSharedPreferences("discipline_prefs", Context.MODE_PRIVATE)
 
         setContent {
@@ -129,6 +133,7 @@ class MainActivity : ComponentActivity() {
                 val dailyLogs by dailyLogDao.getAllLogs().collectAsState(initial = emptyList())
                 val roadmaps by roadmapDao.getAllRoadmaps().collectAsState(initial = emptyList())
                 val roadmapNodes by roadmapDao.getAllNodes().collectAsState(initial = emptyList())
+                val notes by noteDao.getAllNotes().collectAsState(initial = emptyList())
 
                 // Past Days History Dialog state
                 var showHistoryDialog by remember { mutableStateOf(false) }
@@ -510,6 +515,59 @@ class MainActivity : ComponentActivity() {
                                     selectedTab = 3
                                 }
                             )
+                            6 -> NotesScreen(
+                                notes = notes,
+                                onAddNote = { title, content, colorIndex, isPinned, tags, author, checklistJson ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val newNote = Note(
+                                            title = title,
+                                            content = content,
+                                            colorIndex = colorIndex,
+                                            isPinned = isPinned,
+                                            tags = tags,
+                                            author = author.ifBlank { "User" },
+                                            checklistJson = checklistJson
+                                        )
+                                        noteDao.insertNote(newNote)
+                                    }
+                                },
+                                onUpdateNote = { note ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        noteDao.updateNote(note.copy(updatedAt = System.currentTimeMillis()))
+                                    }
+                                },
+                                onDeleteNote = { note ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        noteDao.deleteNote(note)
+                                    }
+                                },
+                                onTogglePin = { note ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        noteDao.setNotePinned(note.id, !note.isPinned)
+                                    }
+                                },
+                                onToggleChecklistItem = { note, idx ->
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        try {
+                                            val arr = org.json.JSONArray(note.checklistJson)
+                                            if (idx in 0 until arr.length()) {
+                                                val item = arr.getJSONObject(idx)
+                                                item.put("done", !item.optBoolean("done", false))
+                                                noteDao.updateNoteChecklist(note.id, arr.toString())
+                                            }
+                                        } catch (_: Exception) {}
+                                    }
+                                },
+                                onOpenAi = {
+                                    selectedTab = 3
+                                }
+                            )
+                        }
+                    }
+
+                    if (selectedTab != 0 && selectedTab != 3 && !showHistoryDialog) {
+                        androidx.activity.compose.BackHandler {
+                            selectedTab = 0
                         }
                     }
 
@@ -638,7 +696,7 @@ class MainActivity : ComponentActivity() {
 
 /**
  * Floating Stadium Capsule Navigation Dock
- * 6 Tabs: Protocols (0), Roadmap (1), Vault (2), Discipline AI (3), Fuel (4), System/Control (5)
+ * 7 Tabs: Protocols (0), Roadmap (1), Notes (6), Vault (2), Discipline AI (3), Fuel (4), System/Control (5)
  */
 @Composable
 fun FloatingBottomDock(
@@ -657,9 +715,9 @@ fun FloatingBottomDock(
                 .clip(CircleShape)
                 .background(colors.dockBg)
                 .border(if (colors.isDark) 1.dp else 0.dp, colors.dockBorder, CircleShape)
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // Tab 0: Home / Protocols
             DockItem(
@@ -677,6 +735,15 @@ fun FloatingBottomDock(
                 selectedIcon = Icons.AutoMirrored.Filled.AltRoute,
                 contentDescription = "Roadmap",
                 onClick = { onTabSelected(1) }
+            )
+
+            // Tab 6: Notes (Google Keep-style Notes)
+            DockItem(
+                isSelected = selectedTab == 6,
+                icon = Icons.Outlined.EditNote,
+                selectedIcon = Icons.Filled.EditNote,
+                contentDescription = "Notes",
+                onClick = { onTabSelected(6) }
             )
 
             // Tab 2: Vault / Study
@@ -727,7 +794,7 @@ fun DockItem(
     onClick: () -> Unit
 ) {
     val colors = AppTheme.colors
-    val size = 42.dp
+    val size = 38.dp
     if (isSelected) {
         // Active Tab: High-Contrast Circle with Dark Icon
         Box(

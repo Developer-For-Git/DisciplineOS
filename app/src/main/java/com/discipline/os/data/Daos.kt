@@ -195,3 +195,54 @@ interface RoadmapDao {
     suspend fun clearAllRoadmaps()
 }
 
+@Dao
+interface NoteDao {
+    @Query("SELECT * FROM notes WHERE isArchived = 0 ORDER BY isPinned DESC, updatedAt DESC, id DESC")
+    fun getAllNotes(): Flow<List<Note>>
+
+    @Query("SELECT * FROM notes WHERE isArchived = 0 ORDER BY isPinned DESC, updatedAt DESC, id DESC")
+    suspend fun getAllNotesSync(): List<Note>
+
+    @Query("SELECT * FROM notes WHERE isArchived = 1 ORDER BY updatedAt DESC, id DESC")
+    fun getArchivedNotes(): Flow<List<Note>>
+
+    @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
+    suspend fun getNoteById(id: Long): Note?
+
+    @Query("SELECT * FROM notes WHERE isArchived = 0 AND (title LIKE '%' || :query || '%' OR content LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%') ORDER BY isPinned DESC, updatedAt DESC, id DESC")
+    fun searchNotes(query: String): Flow<List<Note>>
+
+    @Query("SELECT * FROM notes WHERE isArchived = 0 AND (title LIKE '%' || :query || '%' OR content LIKE '%' || :query || '%' OR tags LIKE '%' || :query || '%') ORDER BY isPinned DESC, updatedAt DESC, id DESC")
+    suspend fun searchNotesSync(query: String): List<Note>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNote(note: Note): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNotes(notes: List<Note>)
+
+    @Update
+    suspend fun updateNote(note: Note)
+
+    @Query("UPDATE notes SET isPinned = :isPinned, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setNotePinned(id: Long, isPinned: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET isArchived = :isArchived, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setNoteArchived(id: Long, isArchived: Boolean, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET colorIndex = :colorIndex, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateNoteColor(id: Long, colorIndex: Int, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notes SET checklistJson = :checklistJson, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateNoteChecklist(id: Long, checklistJson: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Delete
+    suspend fun deleteNote(note: Note)
+
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun deleteNoteById(id: Long)
+
+    @Query("DELETE FROM notes")
+    suspend fun clearAllNotes()
+}
+

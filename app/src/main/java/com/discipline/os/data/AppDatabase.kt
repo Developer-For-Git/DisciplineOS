@@ -8,8 +8,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 @Database(
-    entities = [Task::class, FuelEntry::class, DailyLog::class, VideoEntry::class, Roadmap::class, RoadmapNode::class],
-    version = 5,
+    entities = [Task::class, FuelEntry::class, DailyLog::class, VideoEntry::class, Roadmap::class, RoadmapNode::class, Note::class],
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -18,6 +18,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailyLogDao(): DailyLogDao
     abstract fun videoDao(): VideoDao
     abstract fun roadmapDao(): RoadmapDao
+    abstract fun noteDao(): NoteDao
 
     companion object {
         @Volatile
@@ -65,6 +66,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `notes` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `content` TEXT NOT NULL,
+                        `colorIndex` INTEGER NOT NULL,
+                        `isPinned` INTEGER NOT NULL,
+                        `isArchived` INTEGER NOT NULL,
+                        `tags` TEXT NOT NULL,
+                        `author` TEXT NOT NULL,
+                        `checklistJson` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -72,7 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "discipline_os.db"
                 )
-                .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -155,6 +176,24 @@ abstract class AppDatabase : RoomDatabase() {
                     val toKeep = if (existing.progressPercentage >= roadmap.progressPercentage) existing else roadmap
                     roadmapDao.deleteRoadmapById(toDelete.id)
                     seenRoadmaps[key] = toKeep
+                    deletedCount++
+                }
+            }
+
+            // 5. Deduplicate Notes by normalized title
+            val noteDao = db.noteDao()
+            val allNotes = noteDao.getAllNotesSync()
+            val seenNotes = mutableMapOf<String, Note>()
+            for (note in allNotes) {
+                val key = note.title.trim().lowercase()
+                val existing = seenNotes[key]
+                if (existing == null) {
+                    seenNotes[key] = note
+                } else {
+                    val toDelete = if (existing.updatedAt >= note.updatedAt) note else existing
+                    val toKeep = if (existing.updatedAt >= note.updatedAt) existing else note
+                    noteDao.deleteNoteById(toDelete.id)
+                    seenNotes[key] = toKeep
                     deletedCount++
                 }
             }
@@ -742,6 +781,40 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 )
                 roadmapDao.insertNodes(systemsNodes)
+            }
+
+            // Seed initial Google Notes if empty
+            val noteDao = db.noteDao()
+            val existingNotes = noteDao.getAllNotesSync()
+            if (existingNotes.isEmpty()) {
+                val starterNotes = listOf(
+                    Note(
+                        title = "Welcome to DisciplineOS Notes 📝",
+                        content = "Universal synced notes across your device, AI agent, and PC.\n\n• Google Keep-style pastel colors & top pinning\n• Interactive checkboxes directly on cards\n• Created and edited by You, Agent, or PC\n• Instant search and tag filtering",
+                        colorIndex = 6, // Sky Blue
+                        isPinned = true,
+                        tags = "System, Guide",
+                        author = "Agent"
+                    ),
+                    Note(
+                        title = "Daily Discipline Protocol ☑️",
+                        content = "Non-negotiable execution checklist for peak performance.",
+                        colorIndex = 4, // Emerald Green
+                        isPinned = true,
+                        tags = "Habits, Focus",
+                        author = "User",
+                        checklistJson = """[{"text":"Morning mobility & 10 clean push-ups","done":false},{"text":"Deep work systems architecture (1 hr)","done":false},{"text":"Zero low-dopamine traps & doomscrolling","done":false},{"text":"Compounding evening reflection","done":false}]"""
+                    ),
+                    Note(
+                        title = "Systems & Low-Level Ideas 💡",
+                        content = "Pointer arithmetic, custom memory allocators, cache alignment, and bare-metal OS experiments.\nAlways compile and benchmark independently.",
+                        colorIndex = 2, // Orange
+                        isPinned = false,
+                        tags = "Coding, Ideas",
+                        author = "PC"
+                    )
+                )
+                noteDao.insertNotes(starterNotes)
             }
         }
     }

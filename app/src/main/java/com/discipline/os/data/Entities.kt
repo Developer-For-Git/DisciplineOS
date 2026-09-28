@@ -90,3 +90,18 @@ data class RoadmapNode(
     val checklistJson: String = "[]" // JSON array: [{"text":"Wall Push-ups 3x15","done":false}]
 )
 
+@Entity(tableName = "notes")
+data class Note(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val content: String = "",
+    val colorIndex: Int = 0, // 0 = Default/Slate, 1 = Coral, 2 = Orange, 3 = Yellow, 4 = Green, 5 = Teal, 6 = Blue, 7 = Purple, 8 = Pink
+    val isPinned: Boolean = false,
+    val isArchived: Boolean = false,
+    val tags: String = "", // Comma-separated tags, e.g. "Work, Idea, Fitness"
+    val author: String = "User", // "User", "Agent", "PC"
+    val checklistJson: String = "[]", // JSON array: [{"text":"item","done":false}]
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+

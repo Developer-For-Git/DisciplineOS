@@ -356,6 +356,118 @@ object AgentTools {
                 },
                 required = listOf("steps")
             ))
+
+            put(buildToolObj(
+                name = "add_note",
+                description = "Create and save a new note or checklist in the user's Notes section. Notes have title, body content, optional Google Keep pastel color, tags, checklist items, and top pinning.",
+                properties = JSONObject().apply {
+                    put("title", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Note title (e.g. 'Project Directives', 'Shopping List')")
+                    })
+                    put("content", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Body content or notes text")
+                    })
+                    put("color", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Color theme: 'default', 'coral', 'peach', 'sand', 'sage', 'mint', 'sky', 'violet', 'rose'")
+                    })
+                    put("tags", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Comma separated tags, e.g. 'Ideas, Focus, Security'")
+                    })
+                    put("isPinned", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "Whether to pin this note to the top of the Notes section")
+                    })
+                    put("checklist", JSONObject().apply {
+                        put("type", "array")
+                        put("items", JSONObject().apply { put("type", "string") })
+                        put("description", "Optional list of checklist items for bulleted or todo notes")
+                    })
+                },
+                required = listOf("title")
+            ))
+
+            put(buildToolObj(
+                name = "get_notes",
+                description = "Retrieve notes and checklists from the user's Notes section, with optional keyword or tag search.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Search query or keyword to filter notes (leave empty for all)")
+                    })
+                    put("tag", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Filter by specific tag")
+                    })
+                    put("pinnedOnly", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "Only retrieve pinned notes")
+                    })
+                }
+            ))
+
+            put(buildToolObj(
+                name = "update_note",
+                description = "Update an existing note's title, content, color, pin status, or tags.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Note title keyword or ID to identify which note to update")
+                    })
+                    put("title", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "New title for the note")
+                    })
+                    put("content", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "New body content for the note")
+                    })
+                    put("color", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "New color theme: 'coral', 'peach', 'sand', 'sage', 'mint', 'sky', 'violet', 'rose', 'default'")
+                    })
+                    put("isPinned", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "Pin status")
+                    })
+                    put("tags", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Updated tags")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
+                name = "delete_note",
+                description = "Delete a note from the user's Notes section.",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Note title keyword, ID, or 'last' / 'it' to delete the most recent note")
+                    })
+                },
+                required = listOf("query")
+            ))
+
+            put(buildToolObj(
+                name = "pin_note",
+                description = "Toggle or set the pin status of a note (pinned notes stay at the top).",
+                properties = JSONObject().apply {
+                    put("query", JSONObject().apply {
+                        put("type", "string")
+                        put("description", "Note title keyword or ID")
+                    })
+                    put("isPinned", JSONObject().apply {
+                        put("type", "boolean")
+                        put("description", "True to pin, false to unpin")
+                    })
+                },
+                required = listOf("query", "isPinned")
+            ))
         }
     }
 
@@ -395,6 +507,7 @@ object AgentTools {
         val videoDao = db.videoDao()
         val dailyLogDao = db.dailyLogDao()
         val roadmapDao = db.roadmapDao()
+        val noteDao = db.noteDao()
 
         return try {
             when (toolName) {
@@ -1237,6 +1350,244 @@ object AgentTools {
                             put("activeMinutes", currentStats.activeMinutes)
                         }.toString()
                     )
+                }
+
+                "add_note" -> {
+                    val title = args.getString("title").trim()
+                    val content = args.optString("content", "").trim()
+                    val colorStr = args.optString("color", "default").lowercase()
+                    val colorIdx = when (colorStr) {
+                        "coral", "red" -> 1
+                        "peach", "orange" -> 2
+                        "sand", "yellow" -> 3
+                        "sage", "green" -> 4
+                        "mint", "teal" -> 5
+                        "sky", "blue" -> 6
+                        "violet", "purple" -> 7
+                        "rose", "pink" -> 8
+                        else -> colorStr.toIntOrNull() ?: 0
+                    }
+                    val tags = args.optString("tags", "").trim()
+                    val isPinned = args.optBoolean("isPinned", false)
+
+                    val checklistJson = if (args.has("checklist")) {
+                        val arr = args.getJSONArray("checklist")
+                        val cArr = JSONArray()
+                        for (i in 0 until arr.length()) {
+                            cArr.put(JSONObject().apply {
+                                put("text", arr.getString(i))
+                                put("done", false)
+                            })
+                        }
+                        cArr.toString()
+                    } else "[]"
+
+                    val newNote = Note(
+                        title = title,
+                        content = content,
+                        colorIndex = colorIdx,
+                        isPinned = isPinned,
+                        tags = tags,
+                        author = "Agent",
+                        checklistJson = checklistJson
+                    )
+                    val newId = noteDao.insertNote(newNote)
+                    VibrationHelper.triggerRapidVibration(context)
+
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Saved note: \"$title\" to your Notes section.",
+                        outputJson = JSONObject().apply {
+                            put("success", true)
+                            put("id", newId)
+                            put("title", title)
+                            put("content", content)
+                            put("author", "Agent")
+                            put("colorIndex", colorIdx)
+                            put("isPinned", isPinned)
+                            put("tags", tags)
+                        }.toString()
+                    )
+                }
+
+                "get_notes" -> {
+                    val query = args.optString("query", "").trim()
+                    val tag = args.optString("tag", "").trim()
+                    val pinnedOnly = args.optBoolean("pinnedOnly", false)
+
+                    var list = noteDao.getAllNotesSync()
+                    if (query.isNotBlank()) {
+                        list = list.filter {
+                            it.title.contains(query, ignoreCase = true) ||
+                            it.content.contains(query, ignoreCase = true) ||
+                            it.tags.contains(query, ignoreCase = true)
+                        }
+                    }
+                    if (tag.isNotBlank()) {
+                        list = list.filter { it.tags.contains(tag, ignoreCase = true) }
+                    }
+                    if (pinnedOnly) {
+                        list = list.filter { it.isPinned }
+                    }
+
+                    val arr = JSONArray()
+                    for (n in list) {
+                        arr.put(JSONObject().apply {
+                            put("id", n.id)
+                            put("title", n.title)
+                            put("content", n.content)
+                            put("author", n.author)
+                            put("isPinned", n.isPinned)
+                            put("tags", n.tags)
+                            put("hasChecklist", n.checklistJson.isNotBlank() && n.checklistJson != "[]")
+                        })
+                    }
+
+                    ToolExecutionResult(
+                        toolName = toolName,
+                        success = true,
+                        summary = "Found ${list.size} notes",
+                        outputJson = JSONObject().apply {
+                            put("total", list.size)
+                            put("notes", arr)
+                        }.toString()
+                    )
+                }
+
+                "update_note" -> {
+                    val query = args.getString("query").trim()
+                    val allNotes = noteDao.getAllNotesSync()
+                    val target = allNotes.find {
+                        it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                    }
+
+                    if (target != null) {
+                        val newTitle = if (args.has("title")) args.getString("title") else target.title
+                        val newContent = if (args.has("content")) args.getString("content") else target.content
+                        val colorStr = args.optString("color", "").lowercase()
+                        val newColorIdx = if (colorStr.isNotBlank()) {
+                            when (colorStr) {
+                                "coral", "red" -> 1
+                                "peach", "orange" -> 2
+                                "sand", "yellow" -> 3
+                                "sage", "green" -> 4
+                                "mint", "teal" -> 5
+                                "sky", "blue" -> 6
+                                "violet", "purple" -> 7
+                                "rose", "pink" -> 8
+                                else -> colorStr.toIntOrNull() ?: target.colorIndex
+                            }
+                        } else target.colorIndex
+
+                        val newPinned = if (args.has("isPinned")) args.getBoolean("isPinned") else target.isPinned
+                        val newTags = if (args.has("tags")) args.getString("tags") else target.tags
+
+                        val updated = target.copy(
+                            title = newTitle,
+                            content = newContent,
+                            colorIndex = newColorIdx,
+                            isPinned = newPinned,
+                            tags = newTags,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        noteDao.updateNote(updated)
+
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Updated note: \"$newTitle\"",
+                            outputJson = JSONObject().apply {
+                                put("success", true)
+                                put("id", target.id)
+                                put("title", newTitle)
+                            }.toString()
+                        )
+                    } else {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Note matching \"$query\" not found",
+                            outputJson = "{\"error\": \"Note not found matching: $query\"}"
+                        )
+                    }
+                }
+
+                "delete_note" -> {
+                    val query = args.optString("query", "").trim()
+                    val allNotes = noteDao.getAllNotesSync()
+
+                    val isRelative = query.isBlank() ||
+                        query.equals("last", ignoreCase = true) ||
+                        query.equals("it", ignoreCase = true) ||
+                        query.equals("that", ignoreCase = true) ||
+                        query.equals("this", ignoreCase = true) ||
+                        query.contains("just added", ignoreCase = true)
+
+                    val target = if (isRelative) {
+                        allNotes.maxByOrNull { it.id } ?: allNotes.firstOrNull()
+                    } else {
+                        allNotes.find {
+                            it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                        } ?: allNotes.find { n ->
+                            val words = query.lowercase().split("\\s+".toRegex()).filter { it.length > 2 }
+                            words.isNotEmpty() && words.any { w -> n.title.contains(w, ignoreCase = true) }
+                        }
+                    }
+
+                    if (target != null) {
+                        noteDao.deleteNote(target)
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "Deleted note: \"${target.title}\"",
+                            outputJson = JSONObject().apply {
+                                put("success", true)
+                                put("deletedId", target.id)
+                                put("title", target.title)
+                            }.toString()
+                        )
+                    } else {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Note matching \"$query\" not found",
+                            outputJson = "{\"error\": \"Note not found matching: $query\"}"
+                        )
+                    }
+                }
+
+                "pin_note" -> {
+                    val query = args.getString("query").trim()
+                    val isPinned = args.getBoolean("isPinned")
+                    val allNotes = noteDao.getAllNotesSync()
+
+                    val target = allNotes.find {
+                        it.id.toString() == query || it.title.contains(query, ignoreCase = true)
+                    } ?: (if (query == "last" || query == "it") allNotes.firstOrNull() else null)
+
+                    if (target != null) {
+                        noteDao.setNotePinned(target.id, isPinned)
+                        val status = if (isPinned) "pinned to top" else "unpinned"
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = true,
+                            summary = "\"${target.title}\" is now $status",
+                            outputJson = JSONObject().apply {
+                                put("success", true)
+                                put("id", target.id)
+                                put("title", target.title)
+                                put("isPinned", isPinned)
+                            }.toString()
+                        )
+                    } else {
+                        ToolExecutionResult(
+                            toolName = toolName,
+                            success = false,
+                            summary = "Note matching \"$query\" not found",
+                            outputJson = "{\"error\": \"Note not found matching: $query\"}"
+                        )
+                    }
                 }
 
                 else -> {

@@ -3,6 +3,7 @@ import os
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 import socket
 import subprocess
 import re
@@ -215,6 +216,59 @@ def add_tasks_batch(tasks_list, base_url=None):
             success_count += 1
     print(f"\n🎉 Successfully added {success_count}/{len(tasks_list)} tasks to phone!")
 
+# ==================== NOTES HELPERS ====================
+
+def list_notes(base_url=None, query=None):
+    url = f"/api/notes?q={urllib.parse.quote(query)}" if query else "/api/notes"
+    res = http_request("GET", url, base_url=base_url)
+    notes = res.get("notes", [])
+    print(f"\n=================================================================")
+    print(f" 📝 DisciplineOS Notes ({len(notes)} Total)")
+    print(f"=================================================================")
+    if not notes:
+        print("  (No notes found)")
+    for n in notes:
+        pin = "📌 " if n.get("isPinned") else "   "
+        author = f"[{n.get('author', 'User')}]"
+        print(f"{pin}Note #{n.get('id')}: {n.get('title', 'Untitled')} {author}")
+        if n.get("content"):
+            for line in n.get("content", "").splitlines():
+                print(f"      {line}")
+        checklist = n.get("checklist", [])
+        if checklist:
+            for item in checklist:
+                box = "☑️" if item.get("done") else "⬜"
+                print(f"      {box} {item.get('text', '')}")
+        if n.get("tags"):
+            print(f"      🏷️ {n.get('tags')}")
+        print()
+
+def add_note_cli(title, content="", color_index=0, is_pinned=False, tags="", author="PC / Antigravity", checklist=None, base_url=None):
+    payload = {
+        "title": title,
+        "content": content,
+        "colorIndex": color_index,
+        "isPinned": is_pinned,
+        "tags": tags,
+        "author": author,
+        "checklist": checklist or []
+    }
+    res = http_request("POST", "/api/note/add", payload, base_url=base_url)
+    print(f"✅ Note created #{res.get('id', '')} - '{title}'")
+    return res
+
+def pin_note_cli(note_id, is_pinned=True, base_url=None):
+    payload = {"id": int(note_id), "pinned": is_pinned}
+    res = http_request("POST", "/api/note/pin", payload, base_url=base_url)
+    state = "PINNED 📌" if is_pinned else "UNPINNED"
+    print(f"✅ Note #{note_id} {state}")
+    return res
+
+def delete_note_cli(note_id, base_url=None):
+    res = http_request("POST", "/api/note/delete", {"id": int(note_id)}, base_url=base_url)
+    print(f"🗑️ Note #{note_id} DELETED")
+    return res
+
 # ==================== MAIN DISPATCHER ====================
 
 if __name__ == "__main__":
@@ -333,15 +387,47 @@ if __name__ == "__main__":
         res = http_request("POST", "/api/restore", data, base_url=custom_url)
         print("✅ Database restored:", res.get("message"))
 
+    elif cmd in ("clear-history", "reset-history"):
+        res = http_request("POST", "/api/history/clear", base_url=custom_url)
+        print("✅ Past Days History cleared on phone:", res.get("message"))
+
     elif cmd in ("publish-update", "publish", "release"):
         import subprocess
         script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "publish_update.py")
         subprocess.run([sys.executable, script] + args[1:], check=False)
 
+    elif cmd in ("notes", "list-notes"):
+        query = args[1] if len(args) > 1 else None
+        list_notes(custom_url, query=query)
+
+    elif cmd == "add-note":
+        if len(args) < 2:
+            print("Usage: python sync_phone.py add-note <Title> [Content] [tags] [colorIndex]")
+            sys.exit(1)
+        title = args[1]
+        content = args[2] if len(args) > 2 else ""
+        tags = args[3] if len(args) > 3 else ""
+        color = int(args[4]) if len(args) > 4 and args[4].isdigit() else 0
+        add_note_cli(title, content=content, color_index=color, tags=tags, author="PC / Antigravity", base_url=custom_url)
+
+    elif cmd in ("pin-note", "pin") and len(args) >= 2:
+        pin_note_cli(args[1], is_pinned=True, base_url=custom_url)
+
+    elif cmd in ("unpin-note", "unpin") and len(args) >= 2:
+        pin_note_cli(args[1], is_pinned=False, base_url=custom_url)
+
+    elif cmd in ("delete-note", "del-note") and len(args) >= 2:
+        delete_note_cli(args[1], base_url=custom_url)
+
     else:
         print("DisciplineOS Unified Sync Bridge:")
         print("  python sync_phone.py ping                           (Test connection to phone)")
         print("  python sync_phone.py list                           (Show all tasks on phone)")
+        print("  python sync_phone.py notes [query]                  (Show all notes or search notes)")
+        print("  python sync_phone.py add-note \"Title\" \"Content\"     (Create note from PC)")
+        print("  python sync_phone.py pin-note <id>                  (Pin note to top)")
+        print("  python sync_phone.py delete-note <id>               (Delete note)")
+        print("  python sync_phone.py clear-history                  (Purge all past day progress history)")
         print("  python sync_phone.py add \"Title\" 20:00 [priority]   (Add single task)")
         print("  python sync_phone.py add-batch '[{...}, {...}]'     (Add multiple tasks at once)")
         print("  python sync_phone.py publish-update \"Release notes\" (1-command compile, deploy, OTA push)")

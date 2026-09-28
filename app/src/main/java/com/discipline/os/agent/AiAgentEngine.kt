@@ -549,6 +549,55 @@ class AiAgentEngine(
                     val steps = obj.optInt("totalSteps", 0)
                     "🗺️ **Roadmap Journey Architecture Designed & Initialized**\n\n• **Journey:** $title ($cat)\n• **Generated Milestones:** $steps progressive stages\n\n*Saved to database! Open Roadmap tab to view your complete skill tree.*"
                 }
+                "add_note" -> {
+                    val title = obj.optString("title", "New Note")
+                    val content = obj.optString("content", "")
+                    val isPinned = obj.optBoolean("isPinned", false)
+                    val pinStatus = if (isPinned) " (Pinned to Top 📌)" else ""
+                    val preview = if (content.isNotBlank()) "\n\n> \"${content.take(160)}\"" else ""
+                    "📝 **Note Saved to Notes Section$pinStatus**\n\n• **Title:** \"$title\"\n• **Author:** 🤖 Discipline AI$preview\n\n*Saved to database! Open Notes tab to view, pin, or color-code.*"
+                }
+                "get_notes" -> {
+                    val arr = obj.optJSONArray("notes")
+                    val total = obj.optInt("total", 0)
+                    val sb = StringBuilder()
+                    sb.append("📝 **Your Synced Notes** ($total notes found)\n\n")
+                    if (arr != null && arr.length() > 0) {
+                        for (i in 0 until minOf(arr.length(), 6)) {
+                            val n = arr.getJSONObject(i)
+                            val pin = if (n.optBoolean("isPinned")) "📌 " else "• "
+                            val title = n.optString("title")
+                            val auth = n.optString("author")
+                            val content = n.optString("content").take(60)
+                            val snippet = if (content.isNotBlank()) " — *$content*" else ""
+                            sb.append("$pin**$title** ($auth)$snippet\n")
+                        }
+                        if (arr.length() > 6) sb.append("\n*+ ${arr.length() - 6} more in Notes section.*")
+                    } else {
+                        sb.append("*No notes matching your request.*")
+                    }
+                    sb.toString()
+                }
+                "update_note" -> {
+                    val title = obj.optString("title", "Note")
+                    "📝 **Note Updated Successfully**\n\n• **Note:** \"$title\"\n• **Status:** Saved to Notes database."
+                }
+                "delete_note" -> {
+                    val isSuccess = obj.optBoolean("success", true)
+                    if (!isSuccess || obj.has("error")) {
+                        val err = obj.optString("error", "Note not found")
+                        "⚠️ **Could Not Delete Note**\n\n$err. Notes database was untouched."
+                    } else {
+                        val title = obj.optString("title", "Note")
+                        "🗑️ **Note Erased Successfully**\n\n• **Note:** \"$title\"\n• **Status:** Deleted from Notes database."
+                    }
+                }
+                "pin_note" -> {
+                    val title = obj.optString("title", "Note")
+                    val isPinned = obj.optBoolean("isPinned", true)
+                    val status = if (isPinned) "pinned to top 📌" else "unpinned"
+                    "📌 **Note Pin Updated**\n\n**\"$title\"** is now **$status**."
+                }
                 "add_roadmap_step" -> {
                     val title = obj.optString("title", "Milestone")
                     val stage = obj.optString("stage", "Phase")
@@ -712,6 +761,37 @@ class AiAgentEngine(
             )
         }
 
+        // 1B.3 Note Section Deletion (e.g. "/note delete ...", "delete note", "remove note")
+        val isNoteDelete = (lowerMsg.startsWith("/note") && (lowerMsg.contains("delete") || lowerMsg.contains("remove"))) ||
+                (lowerMsg.contains("note") && (lowerMsg.contains("delete") || lowerMsg.contains("remove") || lowerMsg.contains("erase")))
+        if (isNoteDelete) {
+            var query = lowerMsg.replace("/note", "")
+                .replace("delete", "")
+                .replace("remove", "")
+                .replace("erase", "")
+                .replace("clear", "")
+                .replace("from notes", "")
+                .replace("in notes", "")
+                .replace("note", "")
+                .replace("the", "")
+                .trim()
+            if (query.isBlank() || query == "it" || query == "that" || query == "this") query = "last"
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "delete_note",
+                argumentsJson = JSONObject().apply {
+                    put("query", query)
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Erasing note from database with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
         // 1C. Generic Deletion & Pronoun / Relative Deletion ("delete it", "now delete it", "delete task")
         val isGenericDelete = lowerMsg.startsWith("/delete") ||
                 lowerMsg.startsWith("/protocol delete") ||
@@ -738,6 +818,21 @@ class AiAgentEngine(
                 return ChatMessage(
                     role = "assistant",
                     content = "Erasing last added fuel entry with **${settings.modelName}**...",
+                    toolCalls = listOf(toolCall),
+                    modelName = settings.modelName
+                )
+            }
+
+            // CONTEXT MEMORY: If the user just added a note in the previous turn, delete note!
+            if (isRelative && lastExecutedTool == "add_note") {
+                val toolCall = ToolCall(
+                    id = UUID.randomUUID().toString(),
+                    name = "delete_note",
+                    argumentsJson = JSONObject().apply { put("query", "last") }.toString()
+                )
+                return ChatMessage(
+                    role = "assistant",
+                    content = "Erasing last added note with **${settings.modelName}**...",
                     toolCalls = listOf(toolCall),
                     modelName = settings.modelName
                 )
@@ -795,6 +890,125 @@ class AiAgentEngine(
             return ChatMessage(
                 role = "assistant",
                 content = "Running local on-device command with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 1D. PIN / UNPIN NOTE INTENT (e.g. "pin note ...", "unpin note ...")
+        val isPinNote = lowerMsg.startsWith("pin note") || lowerMsg.startsWith("/pin") ||
+                lowerMsg.contains("pin this note") || lowerMsg.contains("pin note") ||
+                lowerMsg.startsWith("unpin note") || lowerMsg.startsWith("/unpin") ||
+                lowerMsg.contains("unpin this note") || lowerMsg.contains("unpin note")
+        if (isPinNote) {
+            val shouldPin = !lowerMsg.contains("unpin")
+            var query = lowerMsg.replace("pin note", "")
+                .replace("unpin note", "")
+                .replace("/pin", "")
+                .replace("/unpin", "")
+                .replace("pin this note", "")
+                .replace("pin", "")
+                .replace("the note", "")
+                .replace("note", "")
+                .replace("to top", "")
+                .trim()
+            if (query.isBlank() || query == "it" || query == "this" || query == "that") query = "last"
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "pin_note",
+                argumentsJson = JSONObject().apply {
+                    put("query", query)
+                    put("isPinned", shouldPin)
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Updating note pin status with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        // 1E. NOTE SECTION INTENT (Take a note, Add note, Note down, Show notes)
+        val isNoteQuery = lowerMsg == "notes" || lowerMsg == "/notes" || lowerMsg == "my notes" ||
+                lowerMsg.contains("show notes") || lowerMsg.contains("get notes") ||
+                lowerMsg.contains("list notes") || lowerMsg.contains("view notes") ||
+                lowerMsg.contains("what are my notes") || lowerMsg.contains("read notes") ||
+                lowerMsg.contains("all notes")
+
+        val isNoteAdd = lowerMsg.startsWith("/note") ||
+                lowerMsg.startsWith("note:") ||
+                lowerMsg.startsWith("note down") ||
+                lowerMsg.startsWith("take a note") ||
+                lowerMsg.startsWith("take note") ||
+                lowerMsg.startsWith("make a note") ||
+                lowerMsg.startsWith("write a note") ||
+                lowerMsg.startsWith("add note") ||
+                lowerMsg.contains("put note") ||
+                lowerMsg.contains("put a note") ||
+                lowerMsg.contains("create note") ||
+                lowerMsg.contains("save note")
+
+        if (isNoteQuery) {
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "get_notes",
+                argumentsJson = "{}"
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Accessing synced notes with **${settings.modelName}**...",
+                toolCalls = listOf(toolCall),
+                modelName = settings.modelName
+            )
+        }
+
+        if (isNoteAdd) {
+            var raw = lastUserMsg
+            listOf("/note", "note down", "take a note:", "take a note", "take note:", "take note",
+                   "make a note:", "make a note", "write a note:", "write a note", "add note:", "add note",
+                   "put note:", "put a note:", "put note", "put a note", "create note:", "create note",
+                   "save note:", "save note", "note:").forEach { prefix ->
+                raw = raw.replace(Regex("""(?i)^""" + Regex.escape(prefix)), "")
+            }
+            raw = raw.trim(' ', ':', '-', '"', '\'')
+
+            val parts = if (raw.contains(" - ")) raw.split(" - ", limit = 2)
+                        else if (raw.contains(": ")) raw.split(": ", limit = 2)
+                        else if (raw.contains("\n")) raw.split("\n", limit = 2)
+                        else listOf(raw)
+
+            val title = parts[0].trim().take(80).ifBlank { "Quick Note" }
+            val content = if (parts.size > 1) parts[1].trim() else raw
+
+            val color = when {
+                lowerMsg.contains("coral") || lowerMsg.contains("red") -> "coral"
+                lowerMsg.contains("peach") || lowerMsg.contains("orange") -> "peach"
+                lowerMsg.contains("yellow") || lowerMsg.contains("sand") -> "sand"
+                lowerMsg.contains("green") || lowerMsg.contains("sage") -> "sage"
+                lowerMsg.contains("teal") || lowerMsg.contains("mint") -> "mint"
+                lowerMsg.contains("blue") || lowerMsg.contains("sky") -> "sky"
+                lowerMsg.contains("purple") || lowerMsg.contains("violet") -> "violet"
+                lowerMsg.contains("pink") || lowerMsg.contains("rose") -> "rose"
+                else -> "default"
+            }
+            val isPinned = lowerMsg.contains("pin")
+
+            val toolCall = ToolCall(
+                id = UUID.randomUUID().toString(),
+                name = "add_note",
+                argumentsJson = JSONObject().apply {
+                    put("title", title)
+                    put("content", content)
+                    put("color", color)
+                    put("isPinned", isPinned)
+                    put("tags", "Agent")
+                }.toString()
+            )
+            return ChatMessage(
+                role = "assistant",
+                content = "Saving note to Notes section with **${settings.modelName}**...",
                 toolCalls = listOf(toolCall),
                 modelName = settings.modelName
             )

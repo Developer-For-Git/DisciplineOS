@@ -87,6 +87,7 @@ object LocalSyncServer {
             val fuelDao = db.fuelDao()
             val logDao = db.dailyLogDao()
             val videoDao = db.videoDao()
+            val noteDao = db.noteDao()
 
             var responseJson = "{}"
             var statusCode = 200
@@ -101,6 +102,7 @@ object LocalSyncServer {
                     val videos = videoDao.getAllVideosSync()
                     val vPending = videos.count { !it.isWatched }
                     val vWatched = videos.count { it.isWatched }
+                    val notes = noteDao.getAllNotesSync()
 
                     val stepStats = com.discipline.os.telemetry.StepTracker.getInstance(context).stepStats.value
                     val curVersion = try {
@@ -122,6 +124,7 @@ object LocalSyncServer {
                         put("p1_critical_completed", p1Completed)
                         put("videos_pending", vPending)
                         put("videos_watched", vWatched)
+                        put("total_notes", notes.size)
                         put("port", PORT)
                     }
                     responseJson = status.toString()
@@ -525,6 +528,127 @@ object LocalSyncServer {
                     }.toString()
                 }
 
+                // 19. Notes List with optional filters (?query=... or ?tag=... or ?pinned=... or ?author=...)
+                path == "/api/notes" && method == "GET" -> {
+                    var notes = noteDao.getAllNotesSync()
+                    queryParams["query"]?.let { q ->
+                        notes = notes.filter {
+                            it.title.contains(q, ignoreCase = true) ||
+                            it.content.contains(q, ignoreCase = true) ||
+                            it.tags.contains(q, ignoreCase = true)
+                        }
+                    }
+                    queryParams["tag"]?.let { t ->
+                        notes = notes.filter { it.tags.contains(t, ignoreCase = true) }
+                    }
+                    queryParams["pinned"]?.toBooleanStrictOrNull()?.let { p ->
+                        notes = notes.filter { it.isPinned == p }
+                    }
+                    queryParams["author"]?.let { a ->
+                        notes = notes.filter { it.author.contains(a, ignoreCase = true) }
+                    }
+
+                    val array = JSONArray()
+                    for (n in notes) {
+                        array.put(noteToJson(n))
+                    }
+                    responseJson = array.toString()
+                }
+
+                // 20. Single Note details
+                path == "/api/note" && method == "GET" -> {
+                    val id = queryParams["id"]?.toLongOrNull() ?: 0L
+                    val note = noteDao.getNoteById(id)
+                    if (note != null) {
+                        responseJson = noteToJson(note).toString()
+                    } else {
+                        statusCode = 404
+                        responseJson = "{\"error\": \"Note not found\"}"
+                    }
+                }
+
+                // 21. Add Note (PC / Antigravity integration)
+                (path == "/api/note/add" || (path == "/api/notes" && method == "POST")) -> {
+                    val json = JSONObject(body)
+                    val checklistJson = when {
+                        json.has("checklist") -> json.getJSONArray("checklist").toString()
+                        json.has("checklistJson") -> json.getString("checklistJson")
+                        else -> "[]"
+                    }
+                    val newNote = com.discipline.os.data.Note(
+                        title = json.getString("title"),
+                        content = json.optString("content", ""),
+                        colorIndex = json.optInt("colorIndex", json.optInt("color", 0)),
+                        isPinned = json.optBoolean("isPinned", false),
+                        isArchived = json.optBoolean("isArchived", false),
+                        tags = json.optString("tags", ""),
+                        author = json.optString("author", "PC / Antigravity"),
+                        checklistJson = checklistJson
+                    )
+                    val id = noteDao.insertNote(newNote)
+                    val created = noteDao.getNoteById(id)
+                    responseJson = JSONObject().apply {
+                        put("success", true)
+                        put("note", created?.let { noteToJson(it) })
+                    }.toString()
+                }
+
+                // 22. Edit / Update Note
+                (path == "/api/note/update" || (path == "/api/notes" && method == "PUT")) -> {
+                    val json = JSONObject(body)
+                    val id = json.getLong("id")
+                    val existing = noteDao.getNoteById(id)
+                    if (existing != null) {
+                        val checklistJson = when {
+                            json.has("checklist") -> json.getJSONArray("checklist").toString()
+                            json.has("checklistJson") -> json.getString("checklistJson")
+                            else -> existing.checklistJson
+                        }
+                        val updated = existing.copy(
+                            title = json.optString("title", existing.title),
+                            content = json.optString("content", existing.content),
+                            colorIndex = if (json.has("colorIndex")) json.getInt("colorIndex") else if (json.has("color")) json.getInt("color") else existing.colorIndex,
+                            isPinned = if (json.has("isPinned")) json.getBoolean("isPinned") else existing.isPinned,
+                            isArchived = if (json.has("isArchived")) json.getBoolean("isArchived") else existing.isArchived,
+                            tags = json.optString("tags", existing.tags),
+                            author = json.optString("author", existing.author),
+                            checklistJson = checklistJson,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        noteDao.updateNote(updated)
+                        responseJson = JSONObject().apply {
+                            put("success", true)
+                            put("note", noteToJson(updated))
+                        }.toString()
+                    } else {
+                        statusCode = 404
+                        responseJson = "{\"error\": \"Note not found\"}"
+                    }
+                }
+
+                // 23. Pin / Unpin Note
+                path == "/api/note/pin" && method == "POST" -> {
+                    val json = JSONObject(body)
+                    val id = json.getLong("id")
+                    val pinned = json.getBoolean("pinned")
+                    noteDao.setNotePinned(id, pinned)
+                    responseJson = JSONObject().apply {
+                        put("success", true)
+                        put("id", id)
+                        put("isPinned", pinned)
+                    }.toString()
+                }
+
+                // 24. Delete Note
+                (path == "/api/note/delete" && method == "POST") || (path == "/api/note" && method == "DELETE") -> {
+                    val id = if (body.isNotBlank()) JSONObject(body).optLong("id") else queryParams["id"]?.toLongOrNull() ?: 0L
+                    noteDao.deleteNoteById(id)
+                    responseJson = JSONObject().apply {
+                        put("success", true)
+                        put("deleted_id", id)
+                    }.toString()
+                }
+
                 // 14. Advanced Analytics
                 path == "/api/analytics" && method == "GET" -> {
                     val tasks = taskDao.getAllTasksSync()
@@ -589,6 +713,11 @@ object LocalSyncServer {
                         videos.forEach { vArray.put(videoToJson(it)) }
                         put("videos", vArray)
 
+                        val nArray = JSONArray()
+                        val allNotes = noteDao.getAllNotesSync()
+                        allNotes.forEach { nArray.put(noteToJson(it)) }
+                        put("notes", nArray)
+
                         val lArray = JSONArray()
                         logs.forEach { l ->
                             lArray.put(JSONObject().apply {
@@ -640,6 +769,25 @@ object LocalSyncServer {
                                     reminderType = obj.optString("reminderType", "RAPID_VIBRATE"),
                                     isWatched = obj.optBoolean("isWatched", false),
                                     notes = obj.optString("notes", "")
+                                )
+                            )
+                        }
+                    }
+                    if (json.has("notes")) {
+                        val nArray = json.getJSONArray("notes")
+                        noteDao.clearAllNotes()
+                        for (i in 0 until nArray.length()) {
+                            val obj = nArray.getJSONObject(i)
+                            noteDao.insertNote(
+                                com.discipline.os.data.Note(
+                                    title = obj.getString("title"),
+                                    content = obj.optString("content", ""),
+                                    colorIndex = obj.optInt("colorIndex", 0),
+                                    isPinned = obj.optBoolean("isPinned", false),
+                                    isArchived = obj.optBoolean("isArchived", false),
+                                    tags = obj.optString("tags", ""),
+                                    author = obj.optString("author", "User"),
+                                    checklistJson = obj.optString("checklistJson", obj.optJSONArray("checklist")?.toString() ?: "[]")
                                 )
                             )
                         }
@@ -876,10 +1024,38 @@ object LocalSyncServer {
         }
     }
 
+    private fun noteToJson(n: com.discipline.os.data.Note): JSONObject {
+        return JSONObject().apply {
+            put("id", n.id)
+            put("title", n.title)
+            put("content", n.content)
+            put("colorIndex", n.colorIndex)
+            put("colorName", when (n.colorIndex) {
+                1 -> "Coral"
+                2 -> "Peach"
+                3 -> "Sand"
+                4 -> "Sage"
+                5 -> "Mint"
+                6 -> "Sky"
+                7 -> "Violet"
+                8 -> "Rose"
+                else -> "Default"
+            })
+            put("isPinned", n.isPinned)
+            put("isArchived", n.isArchived)
+            put("tags", n.tags)
+            put("author", n.author)
+            put("checklist", JSONArray(n.checklistJson))
+            put("createdAt", n.createdAt)
+            put("updatedAt", n.updatedAt)
+        }
+    }
+
     private suspend fun executeUniversalCommand(context: Context, db: AppDatabase, action: String, params: JSONObject): JSONObject {
         val taskDao = db.taskDao()
         val fuelDao = db.fuelDao()
         val videoDao = db.videoDao()
+        val noteDao = db.noteDao()
         val result = JSONObject()
 
         try {
@@ -1217,21 +1393,123 @@ object LocalSyncServer {
                     result.put("message", "Triggered alarm alert for '$title'")
                 }
 
+                "ADD_NOTE" -> {
+                    val title = params.optString("title", "New Note")
+                    val content = params.optString("content", "")
+                    val colorIdx = params.optInt("colorIndex", params.optInt("color", 0))
+                    val isPinned = params.optBoolean("isPinned", false)
+                    val tags = params.optString("tags", "")
+                    val author = params.optString("author", "PC / Antigravity")
+                    val checklistJson = when {
+                        params.has("checklist") -> params.getJSONArray("checklist").toString()
+                        params.has("checklistJson") -> params.getString("checklistJson")
+                        else -> "[]"
+                    }
+                    val newNote = com.discipline.os.data.Note(
+                        title = title,
+                        content = content,
+                        colorIndex = colorIdx,
+                        isPinned = isPinned,
+                        tags = tags,
+                        author = author,
+                        checklistJson = checklistJson
+                    )
+                    val id = noteDao.insertNote(newNote)
+                    val saved = newNote.copy(id = id)
+                    result.put("success", true)
+                    result.put("id", id)
+                    result.put("message", "Note #$id '$title' saved to Notes database")
+                    result.put("note", noteToJson(saved))
+                }
+
+                "GET_NOTES" -> {
+                    val query = params.optString("query", "")
+                    var notes = noteDao.getAllNotesSync()
+                    if (query.isNotBlank()) {
+                        notes = notes.filter {
+                            it.title.contains(query, ignoreCase = true) ||
+                            it.content.contains(query, ignoreCase = true) ||
+                            it.tags.contains(query, ignoreCase = true)
+                        }
+                    }
+                    val nArr = JSONArray()
+                    notes.forEach { nArr.put(noteToJson(it)) }
+                    result.put("success", true)
+                    result.put("total", notes.size)
+                    result.put("notes", nArr)
+                }
+
+                "UPDATE_NOTE" -> {
+                    val id = if (params.has("id")) params.optLong("id") else params.optLong("noteId", -1L)
+                    val existing = noteDao.getNoteById(id)
+                    if (existing != null) {
+                        val checklistJson = when {
+                            params.has("checklist") -> params.getJSONArray("checklist").toString()
+                            params.has("checklistJson") -> params.getString("checklistJson")
+                            else -> existing.checklistJson
+                        }
+                        val updated = existing.copy(
+                            title = params.optString("title", existing.title),
+                            content = params.optString("content", existing.content),
+                            colorIndex = if (params.has("colorIndex")) params.getInt("colorIndex") else existing.colorIndex,
+                            isPinned = if (params.has("isPinned")) params.getBoolean("isPinned") else existing.isPinned,
+                            tags = params.optString("tags", existing.tags),
+                            author = params.optString("author", existing.author),
+                            checklistJson = checklistJson,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        noteDao.updateNote(updated)
+                        result.put("success", true)
+                        result.put("message", "Note #$id updated successfully")
+                        result.put("note", noteToJson(updated))
+                    } else {
+                        result.put("success", false)
+                        result.put("error", "Note #$id not found")
+                    }
+                }
+
+                "DELETE_NOTE" -> {
+                    val id = if (params.has("id")) params.optLong("id") else params.optLong("noteId", -1L)
+                    noteDao.deleteNoteById(id)
+                    result.put("success", true)
+                    result.put("message", "Note #$id deleted")
+                }
+
+                "PIN_NOTE" -> {
+                    val id = if (params.has("id")) params.optLong("id") else params.optLong("noteId", -1L)
+                    val isPinned = if (params.has("pinned")) params.getBoolean("pinned") else params.optBoolean("isPinned", true)
+                    val note = noteDao.getNoteById(id)
+                    if (note != null) {
+                        noteDao.setNotePinned(id, isPinned)
+                        result.put("success", true)
+                        result.put("id", id)
+                        result.put("isPinned", isPinned)
+                        result.put("message", "Note #$id " + if (isPinned) "pinned to top" else "unpinned")
+                    } else {
+                        result.put("success", false)
+                        result.put("error", "Note #$id not found")
+                    }
+                }
+
                 "FULL_STATE" -> {
                     val tasks = taskDao.getAllTasksSync()
                     val fuel = fuelDao.getAllFuelSync()
                     val videos = videoDao.getAllVideosSync()
+                    val notes = noteDao.getAllNotesSync()
                     val tArr = JSONArray()
                     tasks.forEach { tArr.put(taskToJson(it)) }
                     val fArr = JSONArray()
                     fuel.forEach { fArr.put(fuelToJson(it)) }
                     val vArr = JSONArray()
                     videos.forEach { vArr.put(videoToJson(it)) }
+                    val nArr = JSONArray()
+                    notes.forEach { nArr.put(noteToJson(it)) }
 
                     result.put("success", true)
                     result.put("tasks", tArr)
                     result.put("fuel", fArr)
                     result.put("videos", vArr)
+                    result.put("notes", nArr)
                 }
 
                 "BATCH" -> {
